@@ -1,0 +1,6 @@
+*.rpt
+fp-info-cache
+*.gbr*
+multieff.dsn
+multieff.ses
+*-backups
