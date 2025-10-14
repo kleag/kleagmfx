@@ -1,3 +1,18 @@
+```
+sudo raspi-config
+```
+
+Then go to:
+`Interface Options → I2C → Enable → Reboot the Pi.`
+
+```bash
+sudo apt install -y i2c-tools
+```
+
+```bash
+sudo i2cdetect -y 1
+```
+
 `/home/gael/.config/systemd/user/multieffect.service`
 `/home/gael/.config/systemd/user/default.target.wants/multieffect.service -> /home/gael/.config/systemd/user/multieffect.service`
 
