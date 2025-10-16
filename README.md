@@ -1,3 +1,16 @@
+ADS1115
+MCP23017
+https://github.com/adafruit/Adafruit-MCP23017-Arduino-Library#pin-addressing
+
+KY-040
+n°4 on MCP@0x20
+    - sw pin B1 (9)
+    - but on A0, B0 (0, 8)
+
+Pisound
+Raspberry Pi 5 (4 should be OK)
+Joystick: ADS.P0, ADS.P1
+
 ```
 sudo raspi-config
 ```
