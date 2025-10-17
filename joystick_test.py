@@ -4,6 +4,9 @@ from adafruit_ads1x15.analog_in import AnalogIn
 import adafruit_ads1x15.ads1115 as ADS
 from board import SCL, SDA
 import busio
+import board
+from digitalio import Direction, Pull
+from adafruit_mcp230xx.mcp23017 import MCP23017
 
 # Create I2C bus
 i2c = busio.I2C(SCL, SDA)
@@ -25,11 +28,18 @@ def read_joystick():
     y = (y_axis.voltage - y_center) / y_center
     return max(-1, min(1, x)), max(-1, min(1, y))
 
+# --- Setup MCP23017 ---
+mcp = MCP23017(i2c, address=0x20)
+switch = mcp.get_pin(10)  # B2 is pin 10 in Adafruit MCP23017 library
+switch.direction = Direction.INPUT
+switch.pull = Pull.UP  # Assuming switch connects to GND when pressed
+
 try:
     print("Reading joystick values. Press Ctrl+C to stop.")
     while True:
         x, y = read_joystick()
-        print(f"X: {x_axis.voltage:.3f} V ({x:+.2f}), Y: {y_axis.voltage:.3f} V ({y:+.2f})")
+        switch_state = switch.value  # True = not pressed, False = pressed
+        print(f"X: {x_axis.voltage:.3f} V ({x:+.2f}), Y: {y_axis.voltage:.3f} V ({y:+.2f}), Switch: {'Released' if switch_state else 'Pressed'}")
         time.sleep(0.1)
 except KeyboardInterrupt:
     print("\nExiting cleanly.")
