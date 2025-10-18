@@ -23,8 +23,8 @@ mcp = MCP23017(i2c)
 
 # Setup LEDs as outputs
 led_b3 = mcp.get_pin(11)  # B3 - blinking LED
-led_b4 = mcp.get_pin(12)  # B4
-led_b5 = mcp.get_pin(13)  # B5
+led_b4 = mcp.get_pin(13)  # B4
+led_b5 = mcp.get_pin(12)  # B5
 led_a4 = mcp.get_pin(4)   # A4
 led_a5 = mcp.get_pin(5)   # A5
 

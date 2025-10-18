@@ -16,9 +16,9 @@ mcp2 = MCP23017(i2c, address=0x21)
 # Each entry: (mcp, clk_pin, dt_pin, sw_pin, name)
 encoder_configs = [
     (mcp1, 0, 8, 9,  "Encoder 0"),      # original one
-    (mcp1, 2, 3, 1,  "Encoder 1"),      # first new: A2 (clk), A3 (dt), A1 (sw)
-    (mcp2, 6, 7, 5,  "Encoder 2"),      # second: B6 (clk), B7 (dt), B5 (sw)
-    (mcp2, 3, 4, 2,  "Encoder 3"),      # third: B3 (clk), B4 (dt), B2 (sw)
+    (mcp1, 3, 2, 1,  "Encoder 1"),      # first new: A2 (clk), A3 (dt), A1 (sw)
+    (mcp2, 15, 14, 13,  "Encoder 2"),      # second: B6 (clk), B7 (dt), B5 (sw)
+    (mcp2, 12, 11, 10,  "Encoder 3"),      # third: B3 (clk), B4 (dt), B2 (sw)
 ]
 
 # --- Initialize encoders ---
