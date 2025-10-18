@@ -3,6 +3,7 @@ import time
 import board
 import busio
 from adafruit_mcp230xx.mcp23017 import MCP23017
+from digitalio import Direction, Pull
 
 # I2C setup
 i2c = busio.I2C(board.SCL, board.SDA)
@@ -18,12 +19,12 @@ rows = pins[:4]
 cols = pins[4:]
 
 for row in rows:
-    row.direction = row.Direction.OUTPUT
+    row.direction = Direction.OUTPUT
     row.value = True  # default HIGH
 
 for col in cols:
-    col.direction = col.Direction.INPUT
-    col.pull = col.Pull.UP  # enable pull-ups
+    col.direction = Direction.INPUT
+    col.pull = Pull.UP  # enable pull-ups
 
 # Key mapping for 4x4 keypad
 KEYS = [
