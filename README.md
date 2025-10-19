@@ -9,7 +9,16 @@ n°4 on MCP@0x20
 
 Pisound
 Raspberry Pi 5 (4 should be OK)
+
 Joystick: ADS.P0, ADS.P1
+sudo apt install python3-uinput
+sudo nano /etc/modules
+uinput
+
+sudo nano /etc/udev/rules.d/99-uinput.rules
+KERNEL=="uinput", SUBSYSTEM=="misc", MODE="0660", GROUP="input"
+sudo usermod -a -G input $USER
+
 
 ```
 sudo raspi-config
