@@ -1,108 +1,106 @@
 #!/usr/bin/env python3
-"""
-MCP23017 LED and Button Test Program
-Interrupt-driven version with compact array-based code
-
-LED/Button Mapping:
-- B3: Blinking LED
-- B4 (LED) : B6 (Button)
-- B5 (LED) : B7 (Button)
-- A4 (LED) : A6 (Button)
-- A5 (LED) : A7 (Button)
-"""
-
+import sys
 import time
+import threading
 import board
 import busio
 import lgpio
 from adafruit_mcp230xx.mcp23017 import MCP23017
 from digitalio import Direction, Pull
 
-# GPIO pins for interrupts (connect MCP23017 INTA and INTB to these pins)
-INTERRUPT_PIN_A = 17  # GPIO17 for INTA (Port A buttons)
-INTERRUPT_PIN_B = 27  # GPIO27 for INTB (Port B buttons)
-
-# Initialize I2C and MCP23017
+# --------------------------
+# I2C and MCP23017 setup
+# --------------------------
 i2c = busio.I2C(board.SCL, board.SDA)
-mcp = MCP23017(i2c, address=0x20)
 
-# Setup LED/Button pairs
-led_btn_pairs = [
-    (12, 14),  # B4:B6
-    (13, 15),  # B5:B7
-    (4, 6),    # A4:A6
-    (5, 7),    # A5:A7
-]
+# MCP23017 instances
+mcp = MCP23017(i2c, address=0x20)  # first MCP
+mcp.interrupt_enable = 0xFFFF  # Enable Interrupts in all pins
+mcp.interrupt_configuration = 0x0000  # interrupt on any change
+mcp.io_control = 0x44  # Interrupt as open drain and mirrored
+mcp.clear_ints()  # Interrupts need to be cleared initially
 
-leds = []
-btns = []
+# # Helper: compute bit mask for a given pin number 0..15
+# def bitmask(pin):
+#     return 1 << (pin & 0x0F)
+#
+# pins_to_enable_mask = 0
+# pins_to_enable_mask |= bitmask(4)
+# pins_to_enable_mask |= bitmask(5)
+# pins_to_enable_mask |= bitmask(12)
+# pins_to_enable_mask |= bitmask(13)
+# mcp.interrupt_enable = pins_to_enable_mask
+# --------------------------
+# LEDs and buttons mapping
+# --------------------------
+# LED:Button
+led_button_map = {
+    mcp.get_pin(6): mcp.get_pin(5),  # A6 LED <- A5 button
+    mcp.get_pin(7): mcp.get_pin(4),  # A7 LED <- A4 button
+    mcp.get_pin(14): mcp.get_pin(12),  # B6 LED <- B7 button
+    mcp.get_pin(15): mcp.get_pin(13),  # B7 LED <- B5 button
+}
 
-# Configure LED and button pins
-for led_pin, btn_pin in led_btn_pairs:
-    # Setup LED
-    led = mcp.get_pin(led_pin)
+# Blink LED B3 on MCP1
+blink_led = mcp.get_pin(11)  # B3
+blink_led.direction = Direction.OUTPUT
+
+# Set other LEDs as outputs
+for led in led_button_map.keys():
     led.direction = Direction.OUTPUT
-    led.value = False
-    leds.append(led)
-    
-    # Setup button with pull-up and interrupt
-    btn = mcp.get_pin(btn_pin)
+
+# Set buttons as inputs with pull-ups
+for btn in led_button_map.values():
     btn.direction = Direction.INPUT
     btn.pull = Pull.UP
-    btns.append(btn)
+    # 4. Configure the MCP interrupt behavior for the pin
+    # Enable the pin to generate an interrupt
+    btn.interrupt_enabled = True
+    # Set the interrupt configuration register (INTDEF) to HIGH (True).
+    # This means an interrupt is triggered when the pin value differs from HIGH, i.e., when it goes LOW.
+    btn.interruption_configuration = True
 
-# Setup blinking LED (B3)
-led_blink = mcp.get_pin(11)
-led_blink.direction = Direction.OUTPUT
+# --------------------------
+# LGPIO setup for MCP interrupts
+# --------------------------
+CHIP = 0
+h = lgpio.gpiochip_open(CHIP)
 
-# Enable interrupts on button pins
-mcp.interrupt_enable = 0b11000000 | 0b11000000 << 8  # A6,A7,B6,B7
-mcp.interrupt_configuration = 0xFFFF  # Interrupt on any change
-mcp.default_value = 0xFFFF  # Compare against high (for pull-ups)
+# --------------------------
+# Interrupt handler thread
+# --------------------------
+def monitor_mcp_int(chip, pin, level, timestamp):
+    print(f"Callback called {chip}, {pin}, {level}, {timestamp}")
+    update_leds()
 
-# Setup interrupt handlers with lgpio for both banks
-h = lgpio.gpiochip_open(0)
-lgpio.gpio_claim_input(h, INTERRUPT_PIN_A, lgpio.SET_PULL_UP)
-lgpio.gpio_claim_alert(h, INTERRUPT_PIN_A, lgpio.FALLING_EDGE)
-lgpio.gpio_claim_input(h, INTERRUPT_PIN_B, lgpio.SET_PULL_UP)
-lgpio.gpio_claim_alert(h, INTERRUPT_PIN_B, lgpio.FALLING_EDGE)
+# GPIOs on RPi connected to MCP INTA/INTB pins
+INT_PINS = [5, 7, 22, 27]  # replace with actual pins
+for pin in INT_PINS:
+    if lgpio.gpio_claim_input(h, pin) != 0:
+        print(f"Error")
+        sys.exit(1)
+    # lgpio.callback(h, pin, lgpio.FALLING_EDGE, monitor_mcp_int)
+    lgpio.callback(h, pin, lgpio.BOTH_EDGES, monitor_mcp_int)
 
-print("MCP23017 Test Program (Interrupt-driven)")
-print("Connect INTA to GPIO17 and INTB to GPIO27")
-print("B3 will blink, other LEDs follow button presses")
-print("Press Ctrl+C to exit\n")
 
 def update_leds():
-    """Update all LEDs based on button states"""
-    for led, btn in zip(leds, btns):
-        led.value = not btn.value  # Active low buttons
+    """Read all buttons and update LEDs accordingly."""
+    for led, btn in led_button_map.items():
+        print(btn.value)
+        led.value = not btn.value  # True if button pressed, False if released
 
+# # Start threads for each MCP interrupt pin
+# for pin in INT_PINS:
+#     threading.Thread(target=monitor_mcp_int, args=(pin,), daemon=True).start()
+
+# --------------------------
+# Blink LED B3
+# --------------------------
 try:
-    last_blink = time.time()
-    blink_state = False
-    
     while True:
-        # Blink B3 every 0.5 seconds
-        if time.time() - last_blink >= 0.5:
-            blink_state = not blink_state
-            led_blink.value = blink_state
-            last_blink = time.time()
-        
-        # Check for interrupts
-        e, gpio, level, tick = lgpio.gpio_read_alert(h)
-        if e == lgpio.TIMEOUT:
-            # No interrupt, just wait
-            time.sleep(0.01)
-        else:
-            # Interrupt occurred, clear it and update LEDs
-            _ = mcp.int_flag  # Read to clear interrupt
-            update_leds()
-
+        blink_led.value = not blink_led.value
+        time.sleep(0.5)
 except KeyboardInterrupt:
-    print("\nExiting...")
-    # Turn off all LEDs
-    led_blink.value = False
-    for led in leds:
-        led.value = False
+    pass
+finally:
     lgpio.gpiochip_close(h)
-    print("All LEDs off. Goodbye!")
