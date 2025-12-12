@@ -16,12 +16,13 @@ from gpiozero import Button as GpioZeroButton, LED as GpioZeroLED
 from signal import pause
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 # --- CONFIGURATION ---
-SENSITIVITY = 10.0 # Mouse movement sensitivity
-DEAD_ZONE = 0.1    # Joystick dead zone
-POWER_CURVE = 2.0  # Joystick speed scaling
+SENSITIVITY = 50.0  # Maximum mouse speed in pixels/s
+DEAD_ZONE   = 0.1    # Joystick dead zone
+POWER_CURVE = math.log(1/SENSITIVITY) / math.log(0.02)  # Exponent to match 1px/s at 0.02, 100px/s at 1.0
+
 LOOP_DELAY = 0.01  # General loop delay (seconds)
 ENCODER_STEP = 5  # Value change per encoder tick (approx. 5% of 127)
 
@@ -121,16 +122,21 @@ def read_joystick():
     return max(-1, min(1, x)), max(-1, min(1, y))
 
 def calculate_speed(x, y):
-    """Calculates movement speed based on joystick position."""
-    magnitude = math.sqrt(x**2 + y**2)
-    if magnitude < DEAD_ZONE: return 0, 0
-    scaled_magnitude = (magnitude - DEAD_ZONE) / (1.0 - DEAD_ZONE)
-    speed_factor = math.pow(scaled_magnitude, POWER_CURVE) * SENSITIVITY
-    if magnitude > 0:
-        dx = (x / magnitude) * speed_factor
-        dy = (y / magnitude) * speed_factor
-        return dx, dy
-    return 0, 0
+    """Calculates mouse movement speed from joystick position."""
+    def axis_speed(v):
+        av = abs(v)
+        if av < DEAD_ZONE:
+            return 0.0
+
+        # Normalize after dead zone to range 0–1
+        nv = (av - DEAD_ZONE) / (1.0 - DEAD_ZONE)
+
+        # Exponential curve
+        speed = SENSITIVITY * (nv ** POWER_CURVE)
+
+        return speed if v > 0 else -speed
+
+    return axis_speed(x), axis_speed(y)
 
 # --- ROTARY ENCODERS ---
 encoder_configs = [
@@ -243,11 +249,12 @@ def poll_joystick():
     while True:
         # 1. Joystick Analog Control (Reads from ADS1115)
         x, y = read_joystick()
+        #logger.debug(f"joystick {x},{y}")
         dx, dy = calculate_speed(x, y)
         if dx != 0 or dy != 0:
             try:
-                device.emit(uinput.REL_X, int(dx))
-                device.emit(uinput.REL_Y, int(dy))
+                device.emit(uinput.REL_X, int(-dx))
+                device.emit(uinput.REL_Y, int(-dy))
             except NameError: # Handle case where uinput device failed to initialize
                 pass
 
@@ -255,10 +262,11 @@ def poll_joystick():
         joystick_switch_state = joystick_sw.value  # True = not pressed
         if joystick_switch_state != joystick_last_switch_state:
             uinput_state = 1 if joystick_switch_state == False else 0
+            logger.debug(f"joystick button new state: {uinput_state}")
             try:
-                device.emit(uinput.BTN_LEFT, uinput_state)
-            except NameError:
-                pass
+                device.emit(uinput.BTN_RIGHT, uinput_state)
+            except NameError as e:
+                logger.error(f"Name error in joystick button: {e}")
 
         joystick_last_switch_state = joystick_switch_state
 
