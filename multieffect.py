@@ -101,7 +101,7 @@ buttons = [MCPButton(MCP_MAP[mcp], pin) for mcp, pin in BUTTON_PINS_MAP]
 leds = [MCPLed(MCP_MAP[mcp], pin) for mcp, pin in LED_PINS_MAP]
 
 # --- JOYSTICK/MOUSE SETUP (retained ADS1115 usage) ---
-events = (uinput.REL_X, uinput.REL_Y, uinput.BTN_LEFT)
+events = (uinput.REL_X, uinput.REL_Y, uinput.BTN_LEFT, uinput.BTN_RIGHT, uinput.BTN_MIDDLE)
 try:
     device = uinput.Device(events)
 except Exception as e:
@@ -264,7 +264,7 @@ def poll_joystick():
             uinput_state = 1 if joystick_switch_state == False else 0
             logger.debug(f"joystick button new state: {uinput_state}")
             try:
-                device.emit(uinput.BTN_RIGHT, uinput_state)
+                device.emit(uinput.BTN_MIDDLE, uinput_state)
             except NameError as e:
                 logger.error(f"Name error in joystick button: {e}")
 
