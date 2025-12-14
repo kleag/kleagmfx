@@ -84,19 +84,19 @@ class RotaryEncoder:
             transition = (self.last_state << 2) | current_state
 
             # 5. Check if the transition is valid and update
-            if transition in CW_transitions:
+            if transition in RotaryEncoder.CW_transitions:
                 # logger.debug(f"Encoder {encoder['name']} Rotated → (clockwise)")
                 self.last_state = current_state # Update state after a valid step
                 direction = 1
                 # logger.info(f"{encoder['name']} turned {direction}, send to {encoder['cc']}")
-                increment_cc_value(encoder, direction)
+                self.increment_cc_value(direction)
 
-            elif transition in CCW_transitions:
+            elif transition in RotaryEncoder.CCW_transitions:
                 # logger.debug(f"Encoder {encoder['name']} Rotated → (counterclockwise)")
                 self.last_state = current_state # Update state after a valid step
                 direction = -1
                 # logger.debug(f"{encoder['name']} turned {direction}, send to {encoder['cc']}")
-                increment_cc_value(encoder, direction)
+                self.increment_cc_value(direction)
 
             # 6. Optional: If the transition is invalid (i.e., due to bounce/noise),
             #    we generally ignore it and wait for a valid state.

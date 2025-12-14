@@ -58,14 +58,14 @@ class KeyPad:
         return None
 
     def set_bank(self, value: int):
-        logger.info(f"KeyPad.set_bank {value}")
+        # logger.info(f"KeyPad.set_bank {value}")
         self.task_queue.put(("reset", []))
         self.midi_out.send(mido.Message('control_change', control=0, value=2))
         self.midi_out.send(mido.Message('control_change', control=32, value=value))
         self.midi_out.send(mido.Message('program_change', program=0))
 
     def set_preset(self, value: int):
-        logger.info(f"KeyPad.set_preset {value}")
+        # logger.info(f"KeyPad.set_preset {value}")
         self.task_queue.put(("reset", []))
         self.midi_out.send(mido.Message('program_change', program=value))
 
@@ -74,7 +74,7 @@ class KeyPad:
             # Keypad Scan
             key = self.scan_keypad()
             if key and key != self.last_key:
-                logger.info(f"Key pressed: {key}")
+                # logger.info(f"Key pressed: {key}")
                 if key in 'ABCD': self.set_bank(ord(key) - ord('A'))
                 elif key in '0123456789': self.set_preset(int(key))
                 self.last_key = key

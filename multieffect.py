@@ -45,17 +45,20 @@ def send_cc(cc, value):
 
 # --- BUTTON HANDLERS ---
 def handle_effect_toggle(idx):
+    # logger.info(f"handle_effect_toggle {idx}")
     effect_states[idx] = not effect_states[idx]
-    leds[idx].value = effect_states[idx]
+    if leds[idx] is not None:
+        leds[idx].value = effect_states[idx]
     send_cc(SWITCH_CC + idx, 127 if effect_states[idx] else 0)
-    logger.info(f"Button {idx} pressed. State: {effect_states[idx]}")
+    # logger.info(f"Button {idx} pressed. State: {effect_states[idx]}")
 
 
 def reset():
     logger.info("reset")
     for i in range(len(effect_states)):
         effect_states[i] = False
-        leds[i].value = False
+        if leds[i] is not None:
+            leds[i].value = False
 
 # --- THREADS ---
 
@@ -77,6 +80,7 @@ def midi_input_thread():
                         break
 
 def buttons_thread():
+    while True:
         # MCP Button Scan
         for i, btn in enumerate(buttons):
             btn.check(i)
@@ -140,10 +144,13 @@ for mcp, clk_pin, dt_pin, sw_pin, name, cc in encoder_configs:
     encoder = RotaryEncoder(midi_out, mcp, name, clk_pin, dt_pin, sw_pin, cc)
     encoders.append(encoder)
     buttons.append(encoder.button)
+    effect_states.append(False)
+    leds.append(None)
 
 
 for i, btn in enumerate(buttons):
     btn.when_pressed = handle_effect_toggle
+
 
 # === Main ===
 if __name__ == "__main__":
@@ -160,4 +167,7 @@ if __name__ == "__main__":
     threading.Thread(target=main_thread_loop, daemon=True).start()
 
     logger.info("Kleag's Multi-effect daemon running.")
-    pause()
+    try:
+        pause()
+    except KeyboardInterrupt:
+        logger.info("Kleag's Multi-effect daemon terminating through keyboard interrupt.")
