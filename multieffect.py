@@ -15,15 +15,15 @@ from digitalio import Direction, Pull
 from gpiozero import Button as GpioZeroButton, LED as GpioZeroLED
 from signal import pause
 
+from joystick import Joystick
+from mcp_button import MCPButton
+from mcp_led import MCPLed
+
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
 # --- CONFIGURATION ---
-SENSITIVITY = 50.0  # Maximum mouse speed in pixels/s
-DEAD_ZONE   = 0.1    # Joystick dead zone
-POWER_CURVE = math.log(1/SENSITIVITY) / math.log(0.02)  # Exponent to match 1px/s at 0.02, 100px/s at 1.0
 
-LOOP_DELAY = 0.01  # General loop delay (seconds)
 ENCODER_STEP = 5  # Value change per encoder tick (approx. 5% of 127)
 
 SWITCH_CC = 64  # MIDI CC number for effect toggles
@@ -65,38 +65,6 @@ power_led = mcp1.get_pin(POWER_LED_PIN)
 power_led.direction = Direction.OUTPUT
 power_led.value = True
 
-# --- BUTTONS & LEDS (MCP23017) ---
-class MCPButton:
-    def __init__(self, mcp, pin):
-        self.pin = mcp.get_pin(pin)
-        self.pin.direction = Direction.INPUT
-        self.pin.pull = Pull.UP
-        self.last_state = not self.pin.value # Active Low
-        self.when_pressed = None
-
-    def check(self, idx):
-        current_state = not self.pin.value
-        if current_state and not self.last_state:
-            if self.when_pressed:
-                self.when_pressed(idx)
-        self.last_state = current_state
-
-class MCPLed:
-    def __init__(self, mcp, pin):
-        self.pin = mcp.get_pin(pin)
-        self.pin.direction = Direction.OUTPUT
-        self._value = False
-        self.value = False
-
-    @property
-    def value(self):
-        return self._value
-
-    @value.setter
-    def value(self, state):
-        self._value = state
-        self.pin.value = state
-
 buttons = [MCPButton(MCP_MAP[mcp], pin) for mcp, pin in BUTTON_PINS_MAP]
 leds = [MCPLed(MCP_MAP[mcp], pin) for mcp, pin in LED_PINS_MAP]
 
@@ -107,36 +75,6 @@ try:
 except Exception as e:
     logger.error(f"UInput device creation failed. Check permissions (sudo or your user in the input group setup with udev). Error: {e}")
     exit(1)
-
-joystick_sw = mcp1.get_pin(10)  # B2
-joystick_sw.direction = Direction.INPUT
-joystick_sw.pull = Pull.UP
-joystick_last_switch_state = True # True = not pressed
-
-def read_joystick():
-    """Return normalized X, Y values in range -1.0 .. +1.0 using ADS1115."""
-    x_center = 1.65 # Approximate center voltage
-    y_center = 1.65
-    x = (joystick_x_axis.voltage - x_center) / x_center
-    y = (joystick_y_axis.voltage - y_center) / y_center
-    return max(-1, min(1, x)), max(-1, min(1, y))
-
-def calculate_speed(x, y):
-    """Calculates mouse movement speed from joystick position."""
-    def axis_speed(v):
-        av = abs(v)
-        if av < DEAD_ZONE:
-            return 0.0
-
-        # Normalize after dead zone to range 0–1
-        nv = (av - DEAD_ZONE) / (1.0 - DEAD_ZONE)
-
-        # Exponential curve
-        speed = SENSITIVITY * (nv ** POWER_CURVE)
-
-        return speed if v > 0 else -speed
-
-    return axis_speed(x), axis_speed(y)
 
 # 1st from left to right above : mcp n°2 clk B4=12 dt B3=11 sw B2=10
 # 2nd from left to right above : mcp n°2 clk B7=15 dt B6=14 sw B5=13
@@ -236,52 +174,7 @@ def read_encoder_state_machine(encoder):
             encoder["last_state"] = current_state
         # The key is to only update last_state *after* a valid transition has completed.
 
-# def read_encoder_fixed(encoder):
-#     clk_value = encoder["clk"].value
-#     dt_value = encoder["dt"].value
-#
-#     # --- Check for CLK edge ---
-#     if clk_value != encoder["last_clk"]:
-#         # The key improvement: only react on a specific edge,
-#         # typically the falling edge (High -> Low).
-#         # Assuming you want to detect the change when CLK goes from HIGH to LOW (0)
-#         # Note: Pin values are typically True/False or 1/0 for HIGH/LOW.
-#         # We'll use 0/1 for clarity, adjust for your specific pin library.
-#
-#         # If the pin is transitioning from HIGH (1) to LOW (0)
-#         if clk_value == 0:
-#             # Check the state of DT at the moment CLK goes LOW
-#             if dt_value != clk_value: # If DT is HIGH (1) and CLK is LOW (0) -> CW
-#                 print(f"Encoder {encoder['name']} Rotated → (clockwise)")
-#             else: # If DT is LOW (0) and CLK is LOW (0) -> CCW
-#                 print(f"Encoder {encoder['name']} Rotated → (counterclockwise)")
-#
-#         # This simple check on a single edge (e.g., LOW) inherently helps with
-#         # debouncing by only reacting to the final transition state.
-#
-#     encoder["last_clk"] = clk_value
-#
-# def read_encoder(encoder):
-#     clk_value = encoder["clk"].value
-#     dt_value = encoder["dt"].value
-#
-#     if clk_value != encoder["last_clk"]:  # Edge detected
-#         if dt_value != clk_value:
-#             print(f"Encoder {encoder['name']} Rotated → (clockwise)")
-#         else:
-#             print(f"Encoder {encoder['name']} Rotated → (counterclockwise)")
-#     encoder["last_clk"] = clk_value
 
-# def read_encoder_sw(encoder):
-#     current_sw = encoder["sw"].value
-#
-#     if current_sw != encoder["last_sw"]:  # Active low
-#         encoder["last_sw"] = current_sw
-#         if not current_sw:
-#             print(f"Encoder {encoder['name']} Button pressed!")
-#         else:
-#             print(f"Encoder {encoder['name']} Button released!")
-#
 # --- MIDI/ENCODER LOGIC ---
 effect_states = [False] * 4 # Global state for MIDI toggles
 
@@ -359,35 +252,6 @@ for i, btn in enumerate(buttons):
 
 # --- THREADS ---
 
-def poll_joystick():
-    global joystick_last_switch_state
-    while True:
-        # 1. Joystick Analog Control (Reads from ADS1115)
-        x, y = read_joystick()
-        #logger.debug(f"joystick {x},{y}")
-        dx, dy = calculate_speed(x, y)
-        if dx != 0 or dy != 0:
-            try:
-                device.emit(uinput.REL_X, int(-dx))
-                device.emit(uinput.REL_Y, int(-dy))
-            except NameError: # Handle case where uinput device failed to initialize
-                pass
-
-        # 2. Joystick Button (Reads from MCP23017)
-        joystick_switch_state = joystick_sw.value  # True = not pressed
-        if joystick_switch_state != joystick_last_switch_state:
-            uinput_state = 1 if joystick_switch_state == False else 0
-            logger.debug(f"joystick button new state: {uinput_state}")
-            try:
-                device.emit(uinput.BTN_MIDDLE, uinput_state)
-            except NameError as e:
-                logger.error(f"Name error in joystick button: {e}")
-
-        joystick_last_switch_state = joystick_switch_state
-
-        time.sleep(LOOP_DELAY)
-
-
 def midi_input_thread():
     logger.info("Listening for incoming MIDI messages...")
     for msg in midi_in:
@@ -434,7 +298,8 @@ def poll_encoders_thread():
 
 # === Main ===
 if __name__ == "__main__":
-    threading.Thread(target=poll_joystick, daemon=True).start()
+    joystick = Joystick(i2c, ads, mcp)
+    threading.Thread(target=joystick.poll_joystick, daemon=True).start()
     threading.Thread(target=keypad_and_buttons_thread, daemon=True).start()
     threading.Thread(target=midi_input_thread, daemon=True).start()
     threading.Thread(target=poll_encoders_thread, daemon=True).start()
