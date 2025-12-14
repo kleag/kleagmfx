@@ -3,6 +3,7 @@ import board
 import busio
 import time
 import mido
+import queue
 import logging
 import threading
 
@@ -26,9 +27,9 @@ class KeyPad:
         ['7', '8', '9', 'C'],
         ['*', '0', '#', 'D']
     ]
-    def __init__(self, midi_out, mcp: MCP23017, row_pins: List[int] = KEYPAD_ROW_PINS, col_pins: List[int] = KEYPAD_COL_PINS):
+    def __init__(self, task_queue: queue.Queue, midi_out, mcp: MCP23017, row_pins: List[int] = KEYPAD_ROW_PINS, col_pins: List[int] = KEYPAD_COL_PINS):
+        self.task_queue = task_queue
         self.last_key = None
-        self.effect_states = [False] * 4 # Global state for MIDI toggles
         self.midi_out = midi_out
         self.mcp = mcp
         kp_pins = row_pins + col_pins
@@ -58,20 +59,15 @@ class KeyPad:
 
     def set_bank(self, value: int):
         logger.info(f"KeyPad.set_bank {value}")
-        for i in range(len(self.effect_states)):
-            self.effect_states[i] = False
-            # leds[i].value = False
+        self.task_queue.put(("reset", []))
         self.midi_out.send(mido.Message('control_change', control=0, value=2))
         self.midi_out.send(mido.Message('control_change', control=32, value=value))
         self.midi_out.send(mido.Message('program_change', program=0))
 
     def set_preset(self, value: int):
         logger.info(f"KeyPad.set_preset {value}")
-        for i in range(len(self.effect_states)):
-            self.effect_states[i] = False
-            # leds[i].value = False
+        self.task_queue.put(("reset", []))
         self.midi_out.send(mido.Message('program_change', program=value))
-
 
     def keypad_thread(self):
         while True:
@@ -93,8 +89,8 @@ if __name__ == "__main__":
     mcp = MCP23017(i2c, address=0x21)
     # --- MIDI SETUP ---
     midi_out = mido.open_output('KleagMFX', virtual=True)
-
-    keypad = KeyPad(midi_out, mcp)
+    task_queue = queue.Queue()
+    keypad = KeyPad(task_queue, midi_out, mcp)
     threading.Thread(target=keypad.keypad_thread, daemon=True).start()
 
     logger.info("KeyPad daemon running.")

@@ -47,7 +47,7 @@ class RotaryEncoder:
     CCW_transitions = {0b0001, 0b0111, 0b1110, 0b1000}
 
     def __init__(self, midi_out, mcp: MCP23017, name: str, clk_pin: int, dt_pin: int, sw_pin: int, cc: int):
-        logger.info(f"RotaryEncoder {name}, {clk_pin}, {dt_pin}, {sw_pin}, {cc}")
+        # logger.info(f"RotaryEncoder {name}, {clk_pin}, {dt_pin}, {sw_pin}, {cc}")
         self.midi_out = midi_out
         self.clk = mcp.get_pin(clk_pin)
         self.dt = mcp.get_pin(dt_pin)
@@ -113,7 +113,7 @@ class RotaryEncoder:
             # The key is to only update last_state *after* a valid transition has completed.
 
     def send_cc(self, value):
-        logger.info(f"RotaryEncoder.send_cc {self.cc}, {value}")
+        # logger.info(f"RotaryEncoder.send_cc {self.cc}, {value}")
         msg = mido.Message('control_change', control=self.cc, value=value)
         self.midi_out.send(msg)
 

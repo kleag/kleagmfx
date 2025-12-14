@@ -3,6 +3,7 @@ import adafruit_ads1x15.ads1115 as ADS
 import board
 import busio
 import math
+import queue
 import time
 import uinput
 import mido
@@ -25,7 +26,6 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
 # --- CONFIGURATION ---
-
 SWITCH_CC = 64  # MIDI CC number for effect toggles
 ENCODER_CC_NUMBERS = [20, 21, 22, 23]  # MIDI CC for encoders
 
@@ -36,22 +36,79 @@ POWER_LED_PIN = 11
 BUTTON_PINS_MAP = [(1, 14), (1, 15), (1, 6), (1, 7)] # B6, B7, A6, A7
 LED_PINS_MAP = [(1, 13), (1, 12), (1, 4), (1, 5)] # B5, B4, A4, A5
 
-# --- MIDI SETUP ---
-midi_out = mido.open_output('KleagMFX', virtual=True)
-midi_in = mido.open_input('KleagMFX', virtual=True)
+# --- MIDI/ENCODER LOGIC ---
+effect_states = [False] * 4 # Global state for MIDI toggles
 
 def send_cc(cc, value):
     msg = mido.Message('control_change', control=cc, value=value)
     midi_out.send(msg)
+
+# --- BUTTON HANDLERS ---
+def handle_effect_toggle(idx):
+    effect_states[idx] = not effect_states[idx]
+    leds[idx].value = effect_states[idx]
+    send_cc(SWITCH_CC + idx, 127 if effect_states[idx] else 0)
+    logger.info(f"Button {idx} pressed. State: {effect_states[idx]}")
+
+
+def reset():
+    logger.info("reset")
+    for i in range(len(effect_states)):
+        effect_states[i] = False
+        leds[i].value = False
+
+# --- THREADS ---
+
+def midi_input_thread():
+    # logger.info("Listening for incoming MIDI messages...")
+    for msg in midi_in:
+        # logger.info(f"midi_input_thread received: {msg}")
+        if msg.type == 'control_change':
+            # Update Effect States (SWITCH_CC)
+            if SWITCH_CC <= msg.control <= SWITCH_CC + 3:
+                idx = msg.control - SWITCH_CC
+                effect_states[idx] = msg.value > 0
+                leds[idx].value = effect_states[idx]
+            # Update Encoder CC Value if received externally
+            if msg.control in ENCODER_CC_NUMBERS:
+                for enc in encoders:
+                    if enc["cc"] == msg.control:
+                        enc["midi_value"] = msg.value
+                        break
+
+def buttons_thread():
+        # MCP Button Scan
+        for i, btn in enumerate(buttons):
+            btn.check(i)
+        time.sleep(0.01)
+
+# --- Main Thread Logic ---
+def main_thread_loop():
+    # logger.info("\n[Main Thread] Starting queue processor...")
+
+    while True:
+        while not task_queue.empty():
+            try:
+                func, args = task_queue.get(timeout=0.1)
+                if func == "reset":
+                    reset(*args)
+
+                task_queue.task_done()
+            except queue.Empty:
+                # This happens if the queue is temporarily empty
+                pass
+        time.sleep(0.001)
+
+
+# --- MIDI SETUP ---
+midi_out = mido.open_output('KleagMFX', virtual=True)
+midi_in = mido.open_input('KleagMFX', virtual=True)
 
 # --- HARDWARE INITIALIZATION ---
 i2c = busio.I2C(board.SCL, board.SDA)
 
 # ADS1115 for Joystick (kept as requested)
 ads = ADS.ADS1115(i2c)
-# Use P0 and P1 for Joystick X and Y
-joystick_x_axis = AnalogIn(ads, ADS.P0)
-joystick_y_axis = AnalogIn(ads, ADS.P1)
 
 # MCP23017
 mcp1 = MCP23017(i2c, address=0x20)
@@ -63,6 +120,7 @@ power_led = mcp1.get_pin(POWER_LED_PIN)
 power_led.direction = Direction.OUTPUT
 power_led.value = True
 
+# Foot switches and their associated LED
 buttons = [MCPButton(MCP_MAP[mcp], pin) for mcp, pin in BUTTON_PINS_MAP]
 leds = [MCPLed(MCP_MAP[mcp], pin) for mcp, pin in LED_PINS_MAP]
 
@@ -84,57 +142,22 @@ for mcp, clk_pin, dt_pin, sw_pin, name, cc in encoder_configs:
     buttons.append(encoder.button)
 
 
-# --- MIDI/ENCODER LOGIC ---
-effect_states = [False] * 4 # Global state for MIDI toggles
-
-
-# --- BUTTON HANDLERS ---
-def handle_effect_toggle(idx):
-    effect_states[idx] = not effect_states[idx]
-    leds[idx].value = effect_states[idx]
-    send_cc(SWITCH_CC + idx, 127 if effect_states[idx] else 0)
-    logger.info(f"Button {idx} pressed. State: {effect_states[idx]}")
-
 for i, btn in enumerate(buttons):
     btn.when_pressed = handle_effect_toggle
 
-# --- THREADS ---
-
-def midi_input_thread():
-    logger.info("Listening for incoming MIDI messages...")
-    for msg in midi_in:
-        logger.info(f"midi_input_thread received: {msg}")
-        if msg.type == 'control_change':
-            # Update Effect States (SWITCH_CC)
-            if SWITCH_CC <= msg.control <= SWITCH_CC + 3:
-                idx = msg.control - SWITCH_CC
-                effect_states[idx] = msg.value > 0
-                leds[idx].value = effect_states[idx]
-            # Update Encoder CC Value if received externally
-            if msg.control in ENCODER_CC_NUMBERS:
-                for enc in encoders:
-                    if enc["cc"] == msg.control:
-                        enc["midi_value"] = msg.value
-                        break
-
-def buttons_thread():
-        # MCP Button Scan
-        for i, btn in enumerate(buttons):
-            btn.check(i)
-
-        time.sleep(0.01)
-
 # === Main ===
 if __name__ == "__main__":
+    task_queue = queue.Queue()
     joystick = Joystick(i2c, ads, mcp1)
-    keypad = KeyPad(midi_out, mcp2)
+    keypad = KeyPad(task_queue, midi_out, mcp2)
 
+    threading.Thread(target=midi_input_thread, daemon=True).start()
+    threading.Thread(target=buttons_thread, daemon=True).start()
     threading.Thread(target=joystick.poll_joystick, daemon=True).start()
     threading.Thread(target=keypad.keypad_thread, daemon=True).start()
-    threading.Thread(target=buttons_thread, daemon=True).start()
-    threading.Thread(target=midi_input_thread, daemon=True).start()
     for encoder in encoders:
         threading.Thread(target=encoder.poll_thread, daemon=True).start()
+    threading.Thread(target=main_thread_loop, daemon=True).start()
 
     logger.info("Kleag's Multi-effect daemon running.")
     pause()
