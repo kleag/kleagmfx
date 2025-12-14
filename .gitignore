@@ -1,3 +1,5 @@
+*.swp
+*.s
 .theia
 *.kdev4
 *.rpt
