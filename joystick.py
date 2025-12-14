@@ -78,7 +78,7 @@ class Joystick:
             #logger.debug(f"joystick {x},{y}")
             dx, dy = self.calculate_speed(x, y)
             if dx != 0 or dy != 0:
-                logger.debug(f"joystick {dx},{dy}")
+                # logger.debug(f"joystick {dx},{dy}")
                 try:
                     self.device.emit(uinput.REL_X, int(-dx))
                     self.device.emit(uinput.REL_Y, int(-dy))
@@ -89,7 +89,7 @@ class Joystick:
             switch_state = self.joystick_sw.value  # True = not pressed
             if switch_state != self.last_switch_state:
                 uinput_state = 1 if switch_state == False else 0
-                logger.debug(f"joystick button new state: {uinput_state}")
+                # logger.debug(f"joystick button new state: {uinput_state}")
                 try:
                     self.device.emit(uinput.BTN_MIDDLE, uinput_state)
                 except NameError as e:

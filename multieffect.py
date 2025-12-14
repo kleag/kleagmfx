@@ -298,7 +298,7 @@ def poll_encoders_thread():
 
 # === Main ===
 if __name__ == "__main__":
-    joystick = Joystick(i2c, ads, mcp)
+    joystick = Joystick(i2c, ads, mcp1)
     threading.Thread(target=joystick.poll_joystick, daemon=True).start()
     threading.Thread(target=keypad_and_buttons_thread, daemon=True).start()
     threading.Thread(target=midi_input_thread, daemon=True).start()
