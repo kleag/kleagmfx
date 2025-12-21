@@ -6,6 +6,7 @@ import mido
 import queue
 import logging
 import threading
+import uinput
 
 from adafruit_mcp230xx.mcp23017 import MCP23017
 from digitalio import Direction, Pull
@@ -32,6 +33,18 @@ class KeyPad:
         self.last_key = None
         self.midi_out = midi_out
         self.mcp = mcp
+
+
+        # --- VIRTUAL MOUSE SETUP (buttons only) ---
+        try:
+            self.mouse = uinput.Device([
+                uinput.BTN_LEFT,
+                uinput.BTN_RIGHT,
+            ])
+        except Exception as e:
+            logger.error(f"KeyPad uinput init failed: {e}")
+            self.mouse = None
+
         kp_pins = row_pins + col_pins
 
         self.kp_rows = [self.mcp.get_pin(i) for i in row_pins]
@@ -77,6 +90,12 @@ class KeyPad:
                 # logger.info(f"Key pressed: {key}")
                 if key in 'ABCD': self.set_bank(ord(key) - ord('A'))
                 elif key in '0123456789': self.set_preset(int(key))
+                elif key == '*' and self.mouse:
+                    self.mouse.emit(uinput.BTN_LEFT, 1)
+                    self.mouse.emit(uinput.BTN_LEFT, 0)
+                elif key == '#' and self.mouse:
+                    self.mouse.emit(uinput.BTN_RIGHT, 1)
+                    self.mouse.emit(uinput.BTN_RIGHT, 0)
                 self.last_key = key
             elif key is None:
                 self.last_key = None
