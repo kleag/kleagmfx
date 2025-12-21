@@ -21,6 +21,9 @@ logging.basicConfig(level=logging.DEBUG)
 KEYPAD_ROW_PINS = [0, 1, 2, 3]
 KEYPAD_COL_PINS = [4, 5, 6, 7]
 
+# Max delay (seconds) between digit key presses to form a multi-digit preset
+DIGIT_SEQUENCE_TIMEOUT = 0.4
+
 class KeyPad:
     keypad_map = [
         ['1', '2', '3', 'A'],
@@ -28,12 +31,15 @@ class KeyPad:
         ['7', '8', '9', 'C'],
         ['*', '0', '#', 'D']
     ]
+
     def __init__(self, task_queue: queue.Queue, midi_out, mcp: MCP23017, row_pins: List[int] = KEYPAD_ROW_PINS, col_pins: List[int] = KEYPAD_COL_PINS):
         self.task_queue = task_queue
         self.last_key = None
         self.midi_out = midi_out
         self.mcp = mcp
-
+        self.digit_buffer = ""
+        self.last_digit_time = 0.0
+        self.pending_preset = False
 
         # --- VIRTUAL MOUSE SETUP (buttons only) ---
         try:
@@ -86,16 +92,39 @@ class KeyPad:
         while True:
             # Keypad Scan
             key = self.scan_keypad()
+            now = time.monotonic()
+
+            # Commit pending preset if timeout expired
+            if self.pending_preset and (now - self.last_digit_time) > DIGIT_SEQUENCE_TIMEOUT:
+                try:
+                    preset = int(self.digit_buffer)
+                    self.set_preset(preset)
+                finally:
+                    self.digit_buffer = ""
+                    self.pending_preset = False
+
             if key and key != self.last_key:
                 # logger.info(f"Key pressed: {key}")
-                if key in 'ABCD': self.set_bank(ord(key) - ord('A'))
-                elif key in '0123456789': self.set_preset(int(key))
+                if key in 'ABCD':
+                    self.digit_buffer = ""
+                    self.pending_preset = False
+                    self.set_bank(ord(key) - ord('A'))
+                elif key in '0123456789':
+                    if (now - self.last_digit_time) <= DIGIT_SEQUENCE_TIMEOUT:
+                        self.digit_buffer += key
+                    else:
+                        self.digit_buffer = key
+
+                    self.last_digit_time = now
+                    self.pending_preset = True
                 elif key == '*' and self.mouse:
                     self.mouse.emit(uinput.BTN_LEFT, 1)
                     self.mouse.emit(uinput.BTN_LEFT, 0)
+
                 elif key == '#' and self.mouse:
                     self.mouse.emit(uinput.BTN_RIGHT, 1)
                     self.mouse.emit(uinput.BTN_RIGHT, 0)
+
                 self.last_key = key
             elif key is None:
                 self.last_key = None
