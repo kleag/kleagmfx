@@ -40,6 +40,8 @@ class KeyPad:
         self.digit_buffer = ""
         self.last_digit_time = 0.0
         self.pending_preset = False
+        self.left_state = False
+        self.right_state = False
 
         # --- VIRTUAL MOUSE SETUP (buttons only) ---
         try:
@@ -66,14 +68,13 @@ class KeyPad:
 
     def scan_keypad(self):
         for row_idx, row in enumerate(self.kp_rows):
-            row.value = False
+            row.value = False  # Set current row to LOW
             for col_idx, col in enumerate(self.kp_cols):
-                if not col.value:
+                if not col.value:  # If column is also LOW, key is pressed
                     char = KeyPad.keypad_map[row_idx][col_idx]
-                    while not col.value:
-                        time.sleep(0.01)
+                    row.value = True  # Cleanup: Reset row before returning
                     return char
-            row.value = True
+            row.value = True  # Reset row for next iteration
         return None
 
     def set_bank(self, value: int):
@@ -118,16 +119,34 @@ class KeyPad:
                     self.last_digit_time = now
                     self.pending_preset = True
                 elif key == '*' and self.mouse:
-                    self.mouse.emit(uinput.BTN_LEFT, 1)
-                    self.mouse.emit(uinput.BTN_LEFT, 0)
-
+                    if not self.left_state:
+                        logger.debug(f"Left button pressed")
+                        self.mouse.emit(uinput.BTN_LEFT, 1)
+                        self.mouse.syn() # Ensure the event is flushed to the OS immediately
+                        self.left_state = True
                 elif key == '#' and self.mouse:
-                    self.mouse.emit(uinput.BTN_RIGHT, 1)
-                    self.mouse.emit(uinput.BTN_RIGHT, 0)
-
+                    if not self.right_state:
+                        logger.debug(f"Right button pressed")
+                        self.mouse.emit(uinput.BTN_RIGHT, 1)
+                        self.mouse.syn() # Ensure the event is flushed to the OS immediately
+                        self.right_state = True
                 self.last_key = key
+
+            elif key != '*' and self.left_state:
+                logger.debug(f"Left button released")
+                self.mouse.emit(uinput.BTN_LEFT, 0)
+                self.mouse.syn()
+                self.left_state = False
+
+            elif key != '#' and self.right_state:
+                logger.debug(f"Right button released")
+                self.mouse.emit(uinput.BTN_RIGHT, 0)
+                self.mouse.syn()
+                self.right_state = False
+
             elif key is None:
                 self.last_key = None
+
             time.sleep(0.01)
 
 
