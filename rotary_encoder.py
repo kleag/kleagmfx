@@ -67,6 +67,11 @@ class RotaryEncoder:
         self.button = MCPButton(mcp, sw_pin)
         self.send_cc(self.midi_value)
 
+    def update_from_midi(self, value):
+        """External sync: Updates the internal value without sending a MIDI msg."""
+        if 0 <= value <= 127:
+            self.midi_value = value
+            # logger.debug(f"{self.name} synced to {value}")
 
     def read_encoder_state_machine(self):
 

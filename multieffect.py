@@ -8,6 +8,7 @@ import time
 import uinput
 import mido
 import logging
+import subprocess
 import threading
 
 from adafruit_ads1x15.analog_in import AnalogIn
@@ -65,18 +66,24 @@ def reset():
 def midi_input_thread():
     # logger.info("Listening for incoming MIDI messages...")
     for msg in midi_in:
-        # logger.info(f"midi_input_thread received: {msg}")
+        logger.info(f"midi_input_thread received: {msg}")
         if msg.type == 'control_change':
             # Update Effect States (SWITCH_CC)
             if SWITCH_CC <= msg.control <= SWITCH_CC + 3:
                 idx = msg.control - SWITCH_CC
-                effect_states[idx] = msg.value > 0
-                leds[idx].value = effect_states[idx]
+                new_state = msg.value > 0
+
+                # Only update if the state actually changed to avoid flickering
+                if effect_states[idx] != new_state:
+                    effect_states[idx] = new_state
+                    if leds[idx] is not None:
+                        leds[idx].value = new_state
+                logger.debug(f"Sync: LED {idx} set to {new_state} via MIDI")
             # Update Encoder CC Value if received externally
             if msg.control in ENCODER_CC_NUMBERS:
                 for enc in encoders:
-                    if enc["cc"] == msg.control:
-                        enc["midi_value"] = msg.value
+                    if enc.cc == msg.control:
+                        enc.update_from_midi(msg.value)
                         break
 
 def buttons_thread():
@@ -102,6 +109,16 @@ def main_thread_loop():
                 # This happens if the queue is temporarily empty
                 pass
         time.sleep(0.001)
+
+def link_pipewire_ports():
+    try:
+        # Link Script -> Guitarix
+        subprocess.run(['pw-link', 'Midi-Bridge:RtMidiOut Client:(capture_0) KleagMFX', 'gx_head_amp:midi_in_1'], check=False)
+        # Link Guitarix -> Script
+        subprocess.run(['pw-link', 'gx_head_amp:midi_out_1', 'Midi-Bridge:RtMidiIn Client:(playback_0) KleagMFX'], check=False)
+        logger.info("PipeWire MIDI ports linked successfully.")
+    except Exception as e:
+        logger.error(f"Failed to link PipeWire ports: {e}")
 
 
 # --- MIDI SETUP ---
@@ -154,6 +171,7 @@ for i, btn in enumerate(buttons):
 
 # === Main ===
 if __name__ == "__main__":
+    link_pipewire_ports()
     task_queue = queue.Queue()
     joystick = Joystick(i2c, ads, mcp1)
     keypad = KeyPad(task_queue, midi_out, mcp2)
