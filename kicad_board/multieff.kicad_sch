@@ -12797,7 +12797,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "cc8ce31c-52de-42fc-a06d-377021d4f745")
-		(property "Reference" "WHA"
+		(property "Reference" "WHA1"
 			(at 35.56 41.9101 0)
 			(effects
 				(font
@@ -12852,7 +12852,7 @@
 		(instances
 			(project "multieff"
 				(path "/01a67eee-3893-4e68-bed0-a04a64951ab4"
-					(reference "WHA")
+					(reference "WHA1")
 					(unit 1)
 				)
 			)
