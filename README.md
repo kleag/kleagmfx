@@ -1,3 +1,4 @@
+# Kleag's MFX
 ADS1115
 MCP23017
 https://github.com/adafruit/Adafruit-MCP23017-Arduino-Library#pin-addressing
@@ -60,3 +61,21 @@ systemctl --user enable multieffect.service
 systemctl --user stop multieffect.service
 systemctl --user start multieffect.service
 ```
+
+# License
+
+Copyright Gaël de Chalendar, 2025-2026.
+This source describes Open Hardware and is licensed under the CERN-OHL-
+W v2.
+You may redistribute and modify this documentation and make products
+using it under the terms of the CERN-OHL-W v2 (https:/cern.ch/cern-ohl).
+This documentation is distributed WITHOUT ANY EXPRESS OR IMPLIED
+WARRANTY, INCLUDING OF MERCHANTABILITY, SATISFACTORY QUALITY
+AND FITNESS FOR A PARTICULAR PURPOSE. Please see the CERN-OHL-W v2
+for applicable conditions.
+Source location: https://github.com/kleag/kleagmfx
+As per CERN-OHL-W v2 section 4.1, should You produce hardware based on
+these sources, You must maintain the Source Location visible on the
+external case of the Kleag's MFX or other product you make using
+this documentation.
+
