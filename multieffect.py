@@ -17,6 +17,7 @@ from digitalio import Direction, Pull
 from gpiozero import Button as GpioZeroButton, LED as GpioZeroLED
 from signal import pause
 
+from expression_pedal import ExpressionPedal
 from joystick import Joystick
 from keypad import KeyPad
 from mcp_button import MCPButton
@@ -175,11 +176,14 @@ if __name__ == "__main__":
     task_queue = queue.Queue()
     joystick = Joystick(i2c, ads, mcp1)
     keypad = KeyPad(task_queue, midi_out, mcp2)
+    pedal = ExpressionPedal(i2c, ads)
 
     threading.Thread(target=midi_input_thread, daemon=True).start()
     threading.Thread(target=buttons_thread, daemon=True).start()
     threading.Thread(target=joystick.poll_joystick, daemon=True).start()
     threading.Thread(target=keypad.keypad_thread, daemon=True).start()
+    threading.Thread(target=pedal.poll, daemon=True).start()
+
     for encoder in encoders:
         threading.Thread(target=encoder.poll_thread, daemon=True).start()
     threading.Thread(target=main_thread_loop, daemon=True).start()
