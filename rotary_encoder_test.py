@@ -17,12 +17,12 @@ mcp = MCP23017(i2c, address=MCP_ADDR)
 
 # 1st from left to right above : mcp n°2 clk B4=12 dt B3=11 sw B2=10
 # 2nd from left to right above : mcp n°2 clk B7=15 dt B6=14 sw B5=13
-# 3rd from left to right above : mcp n°1 clk A1=1 dt A2=2 sw A3=3
-# 4th from left to right above (center of the board): mcp n°1 clk B1=9, dt B0=8, sw A0=0
+# 3rd from left to right above : mcp n°1 clk A3=3 dt A2=2 sw A1=1
+# 4th from left to right above (center of the board): mcp n°1 clk A0=0, dt B0=8, sw B1=9
 # Rotary encoder connections
-clk = mcp.get_pin(15)
-dt = mcp.get_pin(14)
-sw = mcp.get_pin(13)   # (push button)
+clk = mcp.get_pin(12)
+dt = mcp.get_pin(11)
+sw = mcp.get_pin(10)   # (push button)
 
 # Configure inputs with pull-ups
 for pin in (clk, dt, sw):

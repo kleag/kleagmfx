@@ -13,6 +13,10 @@ i2c = busio.I2C(board.SCL, board.SDA)
 # MCP23017 at address 0x20
 mcp = MCP23017(i2c, address=0x20)
 
+# 1st from left to right above : mcp n°2 clk B4=12 dt B3=11 sw B2=10
+# 2nd from left to right above : mcp n°2 clk B7=15 dt B6=14 sw B5=13
+# 3rd from left to right above : mcp n°1 clk A3=3 dt A2=2 sw A1=1
+# 4th from left to right above (center of the board): mcp n°1 clk A0=0, dt B0=8, sw B1=9
 # Rotary encoder connections
 clk = mcp.get_pin(0)  # A0
 dt = mcp.get_pin(8)   # B0
