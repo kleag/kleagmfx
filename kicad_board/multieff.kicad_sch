@@ -8276,10 +8276,6 @@
 		(uuid "15cf7903-50d1-4c88-b542-ee5796232c11")
 	)
 	(no_connect
-		(at 48.26 72.39)
-		(uuid "23e83fea-d2f3-400e-8ee8-ab0aa533305c")
-	)
-	(no_connect
 		(at 35.56 135.89)
 		(uuid "311a08e1-a674-40bf-928b-180f22d75dfa")
 	)
@@ -8827,6 +8823,16 @@
 	)
 	(wire
 		(pts
+			(xy 48.26 72.39) (xy 48.26 63.5)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "2f96449a-679c-40b5-9670-3a832aac18f3")
+	)
+	(wire
+		(pts
 			(xy 124.46 118.11) (xy 124.46 124.46)
 		)
 		(stroke
@@ -9054,6 +9060,16 @@
 			(type default)
 		)
 		(uuid "3f5e17ca-442c-4cf3-8b4a-3729e75e09fe")
+	)
+	(wire
+		(pts
+			(xy 48.26 63.5) (xy 43.18 63.5)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "40658244-886d-48bd-a19c-4ed9ad05710a")
 	)
 	(wire
 		(pts
@@ -9454,6 +9470,16 @@
 			(type default)
 		)
 		(uuid "642d4df1-8bc2-4b3d-9e96-366a4d1ef754")
+	)
+	(wire
+		(pts
+			(xy 43.18 63.5) (xy 43.18 57.15)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "65ee562e-a165-416a-9dc1-ade70ef7cd7b")
 	)
 	(polyline
 		(pts
@@ -12472,6 +12498,77 @@
 		)
 	)
 	(symbol
+		(lib_id "Connector_Generic:Conn_01x02")
+		(at 45.72 52.07 270)
+		(mirror x)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "4c51c48a-c109-4143-8920-54a92d891ac5")
+		(property "Reference" "ScrAl1"
+			(at 41.402 49.53 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "Conn_01x02"
+			(at 43.1801 49.53 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+				(hide yes)
+			)
+		)
+		(property "Footprint" "Connector_JST:JST_XH_B2B-XH-AM_1x02_P2.50mm_Vertical"
+			(at 45.72 52.07 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 45.72 52.07 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Generic connector, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)"
+			(at 45.72 52.07 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "a2178471-15f8-4ffb-87fc-e51c0c8cb12a")
+		)
+		(pin "2"
+			(uuid "7abf7ddb-352f-400c-b30e-0c0ea6413d82")
+		)
+		(instances
+			(project "multieff"
+				(path "/01a67eee-3893-4e68-bed0-a04a64951ab4"
+					(reference "ScrAl1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Connector_Generic:Conn_01x05")
 		(at 149.86 129.54 270)
 		(unit 1)
@@ -13694,6 +13791,71 @@
 			(project "multieff"
 				(path "/01a67eee-3893-4e68-bed0-a04a64951ab4"
 					(reference "RotaryEncoder2")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 45.72 57.15 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "c65f67b0-7b34-4725-b3ac-648558322e25")
+		(property "Reference" "#PWR03"
+			(at 45.72 63.5 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 45.72 60.452 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 45.72 57.15 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 45.72 57.15 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 45.72 57.15 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "8cca6cf6-aaeb-4500-aaea-56a10ec94dff")
+		)
+		(instances
+			(project "multieff"
+				(path "/01a67eee-3893-4e68-bed0-a04a64951ab4"
+					(reference "#PWR03")
 					(unit 1)
 				)
 			)
