@@ -502,7 +502,7 @@
       "idf": "",
       "netlist": "",
       "plot": "",
-      "pos_files": "",
+      "pos_files": "production/",
       "specctra_dsn": "multieff.dsn",
       "step": "",
       "svg": "",
