@@ -4471,10 +4471,6 @@
 		(uuid "0750462d-2d73-4609-85bd-bd7abaec6ff9")
 	)
 	(no_connect
-		(at 48.26 72.39)
-		(uuid "23e83fea-d2f3-400e-8ee8-ab0aa533305c")
-	)
-	(no_connect
 		(at 138.43 163.83)
 		(uuid "28825d90-514d-4752-a0e5-89a5eb696305")
 	)
@@ -6135,6 +6131,16 @@
 			(type default)
 		)
 		(uuid "e1993efa-b988-464e-a7e4-4f62d6ee23dd")
+	)
+	(wire
+		(pts
+			(xy 48.26 72.39) (xy 59.69 72.39)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e4b045e5-ccfa-47e9-8883-5220f8086d3f")
 	)
 	(wire
 		(pts
@@ -11022,6 +11028,77 @@
 		)
 	)
 	(symbol
+		(lib_id "Connector_Generic:Conn_01x02")
+		(at 64.77 74.93 0)
+		(mirror x)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "c9ab7819-b435-4c8c-964a-6b0b4f9e4de2")
+		(property "Reference" "ScreenAlim1"
+			(at 60.198 69.342 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "Conn_01x02"
+			(at 67.31 72.3901 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+				(hide yes)
+			)
+		)
+		(property "Footprint" "Connector_JST:JST_XH_B2B-XH-AM_1x02_P2.50mm_Vertical"
+			(at 64.77 74.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 64.77 74.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Generic connector, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)"
+			(at 64.77 74.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "6af86c3e-81cc-48ee-8acd-a6c5bb98ab83")
+		)
+		(pin "2"
+			(uuid "f6970291-d3f5-49e1-9667-98ea527a18ee")
+		)
+		(instances
+			(project "multieff"
+				(path "/01a67eee-3893-4e68-bed0-a04a64951ab4"
+					(reference "ScreenAlim1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "PCM_Resistor_AKL:R_0612")
 		(at 41.91 114.3 90)
 		(unit 1)
@@ -11084,6 +11161,72 @@
 			(project ""
 				(path "/01a67eee-3893-4e68-bed0-a04a64951ab4"
 					(reference "R6")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 59.69 74.93 270)
+		(mirror x)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "ccefebc4-c381-420a-872d-509da7be6a5f")
+		(property "Reference" "#PWR07"
+			(at 53.34 74.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 57.912 77.216 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 59.69 74.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 59.69 74.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 59.69 74.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "7be02998-65e2-49e0-90c8-faa77cc50993")
+		)
+		(instances
+			(project "multieff"
+				(path "/01a67eee-3893-4e68-bed0-a04a64951ab4"
+					(reference "#PWR07")
 					(unit 1)
 				)
 			)
