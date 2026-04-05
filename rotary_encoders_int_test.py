@@ -1,187 +1,112 @@
-#!/usr/bin/env python3
-"""
-Interrupt-driven KY-040 rotary encoder test using MCP23017 expanders
-and lgpio (Raspberry Pi 5 compatible).
-
-This version handles both INTA and INTB pins separately, so all pins
-on both banks are monitored.
-
-Dependencies:
-  pip install adafruit-circuitpython-mcp230xx lgpio
-"""
-
-import time
-import threading
 import board
 import busio
-import lgpio
+import digitalio
+import time
 from adafruit_mcp230xx.mcp23017 import MCP23017
-from digitalio import Direction, Pull
 
-# ------------------ CONFIGURATION ------------------
-# MCP I2C addresses
-I2C_ADDR_MCP1 = 0x20
-I2C_ADDR_MCP2 = 0x21
+# --- Configuration I2C ---
+i2c = busio.I2C(board.SCL, board.SDA)
+mcp1 = MCP23017(i2c, address=0x20)
+mcp2 = MCP23017(i2c, address=0x21)
 
-# BCM GPIO pins for MCP23017 interrupt outputs
-INTA_MCP1 = 17  # port A interrupt
-INTB_MCP1 = 18  # port B interrupt
-INTA_MCP2 = None  # Not used, only B bank is active
-INTB_MCP2 = 27
+# --- Configuration des Pins d'Interruption Pi (Pisound) ---
+int_mcp1 = digitalio.DigitalInOut(board.D22) # Pin 7 Pisound
+int_mcp2 = digitalio.DigitalInOut(board.D5)  # Autre pin libre
+for pin in [int_mcp1, int_mcp2]:
+    pin.direction = digitalio.Direction.INPUT
+    pin.pull = digitalio.Pull.UP
 
-# Rotary encoder layout: (mcp_name, clk_pin, dt_pin, sw_pin, label)
-ENCODERS_DEF = [
-    ("mcp1", 0, 8, 9, "Encoder 0"),  # A0 clk, B0 dt, B1 sw
-    ("mcp1", 2, 3, 1, "Encoder 1"),  # A2 clk, A3 dt, A1 sw
-    ("mcp2", 6, 7, 5, "Encoder 2"),  # B6 clk, B7 dt, B5 sw
-    ("mcp2", 3, 4, 2, "Encoder 3"),  # B3 clk, B4 dt, B2 sw
+# --- Classe de gestion des Encodeurs ---
+class RotaryEncoder:
+    def __init__(self, mcp, clk_pin, dt_pin, sw_pin, name, cc_number):
+        self.mcp = mcp
+        self.clk_num = clk_pin
+        self.dt_num = dt_pin
+        self.sw_num = sw_pin
+        self.name = name
+        self.cc = cc_number
+
+        self.counter = 0
+        self.last_clk_state = 1
+
+        # Initialisation des pins physiques sur le MCP
+        self.pin_clk = mcp.get_pin(clk_pin)
+        self.pin_dt = mcp.get_pin(dt_pin)
+        self.pin_sw = mcp.get_pin(sw_pin)
+
+        for p in [self.pin_clk, self.pin_dt, self.pin_sw]:
+            p.direction = digitalio.Direction.INPUT
+            p.pull = digitalio.Pull.UP
+
+    def update(self, gpio_state):
+        # gpio_state est un entier de 16 bits représentant tout le MCP
+        # Extraction des états via bitmask
+        current_clk = (gpio_state >> self.clk_num) & 0x01
+        current_dt = (gpio_state >> self.dt_num) & 0x01
+        current_sw = (gpio_state >> self.sw_num) & 0x01
+
+        changed = False
+        # Détection de rotation (Falling edge sur CLK)
+        if current_clk != self.last_clk_state and current_clk == 0:
+            if current_dt != current_clk:
+                self.counter = min(127, self.counter + 1)
+            else:
+                self.counter = max(0, self.counter - 1)
+            print(f"{self.name} [CC{self.cc}]: {self.counter}")
+            changed = True
+
+        if current_sw == 0:
+            # Note : à filtrer avec un timer si vous voulez éviter les répétitions
+            pass
+
+        self.last_clk_state = current_clk
+        return changed
+
+# --- Initialisation des instances ---
+ENCODER_CC_NUMBERS = [20, 21, 22, 23]
+
+encoders_mcp1 = [
+    RotaryEncoder(mcp1, 0, 8, 9, "Rotary 1", ENCODER_CC_NUMBERS[0]),
+    RotaryEncoder(mcp1, 3, 2, 1, "Rotary 2", ENCODER_CC_NUMBERS[1])
 ]
 
-BUTTON_DEBOUNCE = 0.15  # seconds
-# ---------------------------------------------------
+encoders_mcp2 = [
+    RotaryEncoder(mcp2, 15, 14, 13, "Rotary 3", ENCODER_CC_NUMBERS[2]),
+    RotaryEncoder(mcp2, 12, 11, 10, "Rotary 4", ENCODER_CC_NUMBERS[3])
+]
 
-# I2C + MCP setup
-i2c = busio.I2C(board.SCL, board.SDA)
-mcp1 = MCP23017(i2c, address=I2C_ADDR_MCP1)
-mcp2 = MCP23017(i2c, address=I2C_ADDR_MCP2)
-mcps = {"mcp1": mcp1, "mcp2": mcp2}
+# --- Configuration Hardware des MCP (Registers) ---
+for m in [mcp1, mcp2]:
+    m.interrupt_configuration = 0x40 # Mode Mirror : INTA/B liés
+    # On active les interruptions sur les pins utilisées
+    # Pour MCP1 : A0, A1, A2, A3 (0x0F) et B0, B1 (0x03)
+    # Pour MCP2 : B2-B7 (0xFC)
+    if m == mcp1:
+        m._write_u8(0x04, 0x0F) # GPINTENA
+        m._write_u8(0x05, 0x03) # GPINTENB
+    else:
+        m._write_u8(0x04, 0x00) # GPINTENA (rien sur port A)
+        m._write_u8(0x05, 0xFC) # GPINTENB (B2 à B7)
 
-# Thread-safe lock for I2C access
-mcp_lock = threading.Lock()
+# --- Boucle principale ---
+print("Multi-Encoder MIDI Controller actif...")
 
-# --- Build encoders table and enable interrupts on MCPs ---
-encoders = []
-mcp_masks = {"mcp1": {"A": 0, "B": 0}, "mcp2": {"A": 0, "B": 0}}
-
-for mname, clk_p, dt_p, sw_p, label in ENCODERS_DEF:
-    mcp = mcps[mname]
-    for p in (clk_p, dt_p, sw_p):
-        pin = mcp.get_pin(p)
-        pin.direction = Direction.INPUT
-        pin.pull = Pull.UP
-        # Update mask for interrupt enable
-        if p < 8:
-            mcp_masks[mname]["A"] |= 1 << p
-        else:
-            mcp_masks[mname]["B"] |= 1 << (p - 8)
-    encoders.append(
-        {
-            "label": label,
-            "mname": mname,
-            "clk_p": clk_p,
-            "dt_p": dt_p,
-            "sw_p": sw_p,
-            "last_clk": mcp.get_pin(clk_p).value,
-            "last_sw": mcp.get_pin(sw_p).value,
-            "last_btn_time": 0.0,
-        }
-    )
-
-# Enable interrupt-on-change for all pins used
-for name, mcp in mcps.items():
-    # Combine masks into 16-bit value
-    mask = (mcp_masks[name]["B"] << 8) | mcp_masks[name]["A"]
-    mcp.interrupt_enable = mask
-    mcp.interrupt_configuration = 0  # compare to previous value
-
-# Snapshot of last GPIO states
-last_gpio = {name: mcp.gpio for name, mcp in mcps.items()}
-
-
-# --- Encoder processing ---
-def handle_encoder(enc, gpio_snapshot):
-    clk = bool(gpio_snapshot & (1 << enc["clk_p"]))
-    dt = bool(gpio_snapshot & (1 << enc["dt_p"]))
-    sw = bool(gpio_snapshot & (1 << enc["sw_p"]))
-
-    # Rotary rotation detection
-    if clk != enc["last_clk"]:
-        direction = "→" if dt != clk else "←"
-        print(f"{enc['label']}: Rotated {direction}")
-        enc["last_clk"] = clk
-
-    # Button press/release (active-low)
-    if sw != enc["last_sw"]:
-        now = time.monotonic()
-        if now - enc["last_btn_time"] > BUTTON_DEBOUNCE:
-            enc["last_btn_time"] = now
-            enc["last_sw"] = sw
-            print(f"{enc['label']}: {'Pressed' if not sw else 'Released'}")
-
-
-# --- MCP callbacks ---
-def make_mcp_callback(mname, mcp):
-    def callback(chip, gpio, level, tick):
-        with mcp_lock:
-            current = mcp.gpio  # read clears interrupt
-            changed = current ^ last_gpio[mname]
-            last_gpio[mname] = current
-        for enc in encoders:
-            if enc["mname"] != mname:
-                continue
-            mask = (1 << enc["clk_p"]) | (1 << enc["dt_p"]) | (1 << enc["sw_p"])
-            if changed & mask:
-                handle_encoder(enc, current)
-
-    return callback
-
-
-# --- lgpio setup ---
-chip = lgpio.gpiochip_open(0)
-int_pins = []
-callbacks = []
-
-# MCP1 INTA
-if INTA_MCP1 is not None:
-    lgpio.gpio_claim_input(chip, INTA_MCP1)
-    lgpio.gpio_set_pull_up(chip, INTA_MCP1)
-    cb = lgpio.callback(
-        chip, INTA_MCP1, lgpio.FALLING_EDGE, make_mcp_callback("mcp1", mcp1)
-    )
-    int_pins.append(INTA_MCP1)
-    callbacks.append(cb)
-
-# MCP1 INTB
-if INTB_MCP1 is not None:
-    lgpio.gpio_claim_input(chip, INTB_MCP1)
-    lgpio.gpio_set_pull_up(chip, INTB_MCP1)
-    cb = lgpio.callback(
-        chip, INTB_MCP1, lgpio.FALLING_EDGE, make_mcp_callback("mcp1", mcp1)
-    )
-    int_pins.append(INTB_MCP1)
-    callbacks.append(cb)
-
-# MCP2 INTA (not used)
-if INTA_MCP2 is not None:
-    lgpio.gpio_claim_input(chip, INTA_MCP2)
-    lgpio.gpio_set_pull_up(chip, INTA_MCP2)
-    cb = lgpio.callback(
-        chip, INTA_MCP2, lgpio.FALLING_EDGE, make_mcp_callback("mcp2", mcp2)
-    )
-    int_pins.append(INTA_MCP2)
-    callbacks.append(cb)
-
-# MCP2 INTB
-if INTB_MCP2 is not None:
-    lgpio.gpio_claim_input(chip, INTB_MCP2)
-    lgpio.gpio_set_pull_up(chip, INTB_MCP2)
-    cb = lgpio.callback(
-        chip, INTB_MCP2, lgpio.FALLING_EDGE, make_mcp_callback("mcp2", mcp2)
-    )
-    int_pins.append(INTB_MCP2)
-    callbacks.append(cb)
-
-print("KY-040 Rotary Encoder Test (interrupt-driven, lgpio, correct INTA/INTB)")
-print("Rotate or press buttons (Ctrl+C to exit)\n")
-
-# --- Main loop ---
 try:
     while True:
-        time.sleep(1)
+        # Check MCP1
+        if not int_mcp1.value:
+            state1 = mcp1.gpio
+            for enc in encoders_mcp1:
+                enc.update(state1)
+
+        # Check MCP2
+        if not int_mcp2.value:
+            state2 = mcp2.gpio
+            for enc in encoders_mcp2:
+                enc.update(state2)
+
+        # Très légère pause pour le scheduler Linux
+        time.sleep(0.001)
+
 except KeyboardInterrupt:
-    pass
-finally:
-    for cb in callbacks:
-        cb.cancel()
-    lgpio.gpiochip_close(chip)
-    print("Clean exit.")
+    print("\nArrêt du contrôleur.")
