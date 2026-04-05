@@ -20,7 +20,6 @@ from mcp_button import MCPButton
 from mcp_led import MCPLed
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG)
 
 # --- CONFIGURATION ---
 
@@ -47,11 +46,10 @@ class RotaryEncoder:
     CCW_transitions = {0b0001, 0b0111, 0b1110, 0b1000}
 
     def __init__(self, midi_out, mcp: MCP23017, name: str, clk_pin: int, dt_pin: int, sw_pin: int, cc: int):
-        # logger.info(f"RotaryEncoder {name}, {clk_pin}, {dt_pin}, {sw_pin}, {cc}")
+        logger.info(f"RotaryEncoder {name}, clk: {clk_pin}, dt: {dt_pin}, sw: {sw_pin}, cc: {cc}")
         self.midi_out = midi_out
         self.clk = mcp.get_pin(clk_pin)
         self.dt = mcp.get_pin(dt_pin)
-        # self.sw = mcp.get_pin(sw_pin)
         initial_clk = self.clk.value
         initial_dt = self.dt.value
         for pin in (self.clk, self.dt):
@@ -65,13 +63,19 @@ class RotaryEncoder:
         # self.last_sw = sw.value
         self.midi_value = SWITCH_CC
         self.button = MCPButton(mcp, sw_pin)
+        self.button.when_pressed = self.button_pressed
         self.send_cc(self.midi_value)
+
+
+    def button_pressed(self):
+        logger.debug(f"RotaryEncoder {self.name} button_pressed")
+
 
     def update_from_midi(self, value):
         """External sync: Updates the internal value without sending a MIDI msg."""
         if 0 <= value <= 127:
             self.midi_value = value
-            # logger.debug(f"{self.name} synced to {value}")
+            logger.debug(f"{self.name} synced to {value}")
 
     def read_encoder_state_machine(self):
 
@@ -90,14 +94,14 @@ class RotaryEncoder:
 
             # 5. Check if the transition is valid and update
             if transition in RotaryEncoder.CW_transitions:
-                # logger.debug(f"Encoder {encoder['name']} Rotated → (clockwise)")
+                logger.debug(f"Encoder {self.name} Rotated → (clockwise)")
                 self.last_state = current_state # Update state after a valid step
                 direction = 1
                 # logger.info(f"{encoder['name']} turned {direction}, send to {encoder['cc']}")
                 self.increment_cc_value(direction)
 
             elif transition in RotaryEncoder.CCW_transitions:
-                # logger.debug(f"Encoder {encoder['name']} Rotated → (counterclockwise)")
+                logger.debug(f"Encoder {self.name} Rotated → (counterclockwise)")
                 self.last_state = current_state # Update state after a valid step
                 direction = -1
                 # logger.debug(f"{encoder['name']} turned {direction}, send to {encoder['cc']}")
@@ -118,7 +122,7 @@ class RotaryEncoder:
             # The key is to only update last_state *after* a valid transition has completed.
 
     def send_cc(self, value):
-        # logger.info(f"RotaryEncoder.send_cc {self.cc}, {value}")
+        logger.info(f"RotaryEncoder.send_cc {self.name}: {self.cc}, {value}")
         msg = mido.Message('control_change', control=self.cc, value=value)
         self.midi_out.send(msg)
 
