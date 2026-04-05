@@ -15,7 +15,6 @@ from signal import pause
 
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG)
 
 # --- CONFIGURATION ---
 SENSITIVITY = 50.0  # Maximum mouse speed in pixels/s
@@ -24,10 +23,10 @@ POWER_CURVE = math.log(1/SENSITIVITY) / math.log(0.02)  # Exponent to match 1px/
 LOOP_DELAY = 0.01  # General loop delay (seconds)
 
 class Joystick:
-    def __init__(self, i2c: busio.I2C, ads: ADS.ADS1115, mcp: MCP23017):
+    def __init__(self, ads: ADS.ADS1115, mcp: MCP23017, lock: threading.Lock):
         # --- HARDWARE INITIALIZATION ---
-        self.i2c = i2c
         self.ads = ads
+        self.lock = lock
         # Use P0 and P1 for Joystick X and Y
         self.joystick_x_axis = AnalogIn(ads, ADS.P0)
         self.joystick_y_axis = AnalogIn(ads, ADS.P1)
@@ -50,8 +49,9 @@ class Joystick:
         """Return normalized X, Y values in range -1.0 .. +1.0 using ADS1115."""
         x_center = 1.65 # Approximate center voltage
         y_center = 1.65
-        x = (self.joystick_x_axis.voltage - x_center) / x_center
-        y = (self.joystick_y_axis.voltage - y_center) / y_center
+        with self.lock:
+            x = (self.joystick_x_axis.voltage - x_center) / x_center
+            y = (self.joystick_y_axis.voltage - y_center) / y_center
         return max(-1, min(1, x)), max(-1, min(1, y))
 
     def calculate_speed(self, x, y):
@@ -75,10 +75,10 @@ class Joystick:
         while True:
             # 1. Joystick Analog Control (Reads from ADS1115)
             x, y = self.read_joystick()
-            #logger.debug(f"joystick {x},{y}")
+            # logger.debug(f"joystick {x},{y}")
             dx, dy = self.calculate_speed(x, y)
             if dx != 0 or dy != 0:
-                # logger.debug(f"joystick {dx},{dy}")
+                logger.debug(f"joystick move: {dx},{dy}")
                 try:
                     self.device.emit(uinput.REL_X, int(-dx))
                     self.device.emit(uinput.REL_Y, int(-dy))
@@ -89,7 +89,7 @@ class Joystick:
             switch_state = self.joystick_sw.value  # True = not pressed
             if switch_state != self.last_switch_state:
                 uinput_state = 1 if switch_state == False else 0
-                # logger.debug(f"joystick button new state: {uinput_state}")
+                logger.debug(f"joystick button new state: {uinput_state}")
                 try:
                     self.device.emit(uinput.BTN_MIDDLE, uinput_state)
                 except NameError as e:
@@ -102,6 +102,7 @@ class Joystick:
 
 # === Main ===
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG)
         # --- HARDWARE INITIALIZATION ---
     i2c = busio.I2C(board.SCL, board.SDA)
 

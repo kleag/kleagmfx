@@ -3,65 +3,85 @@ import adafruit_ads1x15.ads1115 as ADS
 import board
 import busio
 import logging
+import mido
+import statistics
 import threading
 import time
 
 from adafruit_ads1x15.analog_in import AnalogIn
 from signal import pause
 
+# The actual voltages measured at the physical limits of the pedal
+V_MIN = 0.012750000000000001
+V_MAX = 3.02525
+MIDI_CC_NUMBER = 24
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG)
-
 
 class ExpressionPedal:
-    def __init__(self, i2c: busio.I2C, ads: ADS.ADS1115, channel=ADS.P2, gain=1, v_ref=3.3):
+    def __init__(self, midi_out, ads: ADS.ADS1115, lock: threading.Lock, channel=ADS.P2, gain=1, v_ref=3.3):
+        self.midi_out = midi_out
         # --- HARDWARE INITIALIZATION ---
-        self.i2c = i2c
         self.ads = ads
+        self.lock = lock
         self.chan = AnalogIn(self.ads, channel)
+        self.ads.data_rate = 860
 
         # 2. Configuration
         self.v_ref = v_ref
         self.ads.gain = gain  # Gain 1 = +/- 4.096V
 
-        # 3. Data Storage
-        self._current_value = 0.0  # Percentage 0.0 - 100.0
+        self._current_midi_val = -1
         self._running = False
-        self._thread = None
-
-        # Smoothing settings
         self.window_size = 5
         self.readings = [0] * self.window_size
 
+
     def poll(self):
-        """Internal method to be run in a separate thread."""
+        self._running = True
         while self._running:
-            # Calculate voltage and map to percentage
-            voltage = self.chan.voltage
-            raw_percent = (voltage / self.v_ref) * 100
+            with self.lock:
+                voltage = self.chan.voltage
 
-            # Clamp and smooth
-            clamped = max(0, min(100, raw_percent))
+            # Map voltage to 0-127 (MIDI Range)
+            raw_percent = ((voltage - V_MIN) * 127) / (V_MAX - V_MIN)
+            clamped = max(0, min(127, int(raw_percent)))
 
-            # Simple Moving Average (SMA) logic
+            # Smoothing
             self.readings.pop(0)
             self.readings.append(clamped)
-            self._current_value = sum(self.readings) / self.window_size
-            logger.debug(f"Pedal: {self._current_value}")
-            # Polling rate (100Hz is usually plenty for expression pedals)
-            time.sleep(0.01)
+            smoothed_val = int(statistics.median(self.readings))
+            # logger.debug(f"Pedal: {voltage};\t{clamped};\t{smoothed_val}")
 
-# === Main ===
+            # Only send MIDI message if the value has actually changed
+            if abs(smoothed_val - self._current_midi_val) >= 4:
+                self._current_midi_val = smoothed_val
+                self.send_midi(smoothed_val)
+
+            time.sleep(0.1)
+
+    def send_midi(self, value):
+        msg = mido.Message('control_change', control=MIDI_CC_NUMBER, value=value)
+        self.midi_out.send(msg)
+        logger.debug(f"Pedal: Sent MIDI CC {MIDI_CC_NUMBER}: {value}")
+
+
 if __name__ == "__main__":
-        # --- HARDWARE INITIALIZATION ---
+    logging.basicConfig(level=logging.DEBUG)
     i2c = busio.I2C(board.SCL, board.SDA)
-
-    # ADS1115 for ExpressionPedal (kept as requested)
     ads = ADS.ADS1115(i2c)
+    # --- MIDI SETUP ---
+    # This creates a virtual MIDI port that shows up in patchage/qjackctl
+    midi_out = mido.open_output('ExpressionPedalPort', virtual=True)
+    logger.info("Virtual MIDI port 'ExpressionPedalPort' created.")
 
-    pedal = ExpressionPedal(i2c, ads)
-    threading.Thread(target=pedal.poll, daemon=True).start()
+    pedal = ExpressionPedal(midi_out, i2c, ads, ADS.P2)
 
-    logger.info("ExpressionPedal daemon running.")
-    pause()
+    t = threading.Thread(target=pedal.poll, daemon=True)
+    t.start()
+
+    logger.info("ExpressionPedal to MIDI running. Press Ctrl+C to stop.")
+    try:
+        pause()
+    except KeyboardInterrupt:
+        logger.info("Shutting down...")

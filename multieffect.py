@@ -25,7 +25,7 @@ from mcp_led import MCPLed
 from rotary_encoder import RotaryEncoder
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO, force=True)
 
 # --- CONFIGURATION ---
 SWITCH_CC = 64  # MIDI CC number for effect toggles
@@ -67,8 +67,8 @@ def reset():
 def midi_input_thread():
     # logger.info("Listening for incoming MIDI messages...")
     for msg in midi_in:
-        logger.info(f"midi_input_thread received: {msg}")
         if msg.type == 'control_change':
+            logger.info(f"midi_input_thread received: {msg}")
             # Update Effect States (SWITCH_CC)
             if SWITCH_CC <= msg.control <= SWITCH_CC + 3:
                 idx = msg.control - SWITCH_CC
@@ -128,6 +128,7 @@ midi_in = mido.open_input('KleagMFX', virtual=True)
 
 # --- HARDWARE INITIALIZATION ---
 i2c = busio.I2C(board.SCL, board.SDA)
+i2c_lock = threading.Lock()
 
 # ADS1115 for Joystick (kept as requested)
 ads = ADS.ADS1115(i2c)
@@ -146,14 +147,15 @@ power_led.value = True
 buttons = [MCPButton(MCP_MAP[mcp], pin) for mcp, pin in BUTTON_PINS_MAP]
 leds = [MCPLed(MCP_MAP[mcp], pin) for mcp, pin in LED_PINS_MAP]
 
-# 1st from left to right above : mcp n°2 clk B4=12 dt B3=11 sw B2=10
-# 2nd from left to right above : mcp n°2 clk B7=15 dt B6=14 sw B5=13
-# 3rd from left to right above : mcp n°1 clk A1=1 dt A2=2 sw A3=3
-# 4th from left to right above (center of the board): mcp n°1 clk B1=9, dt B0=8, sw A0=0
+# Board label: as visible on physical pedalboard: mcp number and mcp pins map
+# RotaryEncoder4: 1st from left to right above : mcp n°2 clk B4=12 dt B3=11 sw B2=10
+# RotaryEncoder3: 2nd from left to right above : mcp n°2 clk B7=15 dt B6=14 sw B5=13
+# RotaryEncoder2: 3rd from left to right above : mcp n°1 clk A3=3  dt A2=2  sw A1=1
+# RotaryEncoder1: 4th from left to right above : mcp n°1 clk A0=0, dt B0=8, sw B1=9
 # --- ROTARY ENCODERS ---
 encoder_configs = [
-    (mcp1, 9, 8, 0,  "Encoder 0", ENCODER_CC_NUMBERS[0]), # CC 20
-    (mcp1, 1, 2, 3,  "Encoder 1", ENCODER_CC_NUMBERS[1]), # CC 21
+    (mcp1, 0,   8,  9, "Encoder 0", ENCODER_CC_NUMBERS[0]), # CC 20
+    (mcp1, 3,   2,  1, "Encoder 1", ENCODER_CC_NUMBERS[1]), # CC 21
     (mcp2, 15, 14, 13, "Encoder 2", ENCODER_CC_NUMBERS[2]), # CC 22
     (mcp2, 12, 11, 10, "Encoder 3", ENCODER_CC_NUMBERS[3]), # CC 23
 ]
@@ -174,9 +176,9 @@ for i, btn in enumerate(buttons):
 if __name__ == "__main__":
     link_pipewire_ports()
     task_queue = queue.Queue()
-    joystick = Joystick(i2c, ads, mcp1)
+    joystick = Joystick(ads, mcp1, lock=i2c_lock)
     keypad = KeyPad(task_queue, midi_out, mcp2)
-    pedal = ExpressionPedal(i2c, ads)
+    pedal = ExpressionPedal(midi_out, ads, lock=i2c_lock, channel=ADS.P2)
 
     threading.Thread(target=midi_input_thread, daemon=True).start()
     threading.Thread(target=buttons_thread, daemon=True).start()
