@@ -1,4 +1,8 @@
 # Kleag's MFX
+
+
+
+
 ADS1115
 MCP23017
 https://github.com/adafruit/Adafruit-MCP23017-Arduino-Library#pin-addressing
@@ -16,12 +20,24 @@ sudo apt install python3-uinput
 sudo nano /etc/modules
 uinput
 
+Expression Pedal: ADS.P2
+
 sudo nano /etc/udev/rules.d/99-uinput.rules
 KERNEL=="uinput", SUBSYSTEM=="misc", MODE="0660", GROUP="input"
 sudo usermod -a -G input $USER
 
-
+`/boot/firmware/config.txt`:
 ```
+display_auto_detect=1
+dtparam=i2c_arm=on
+dtparam=spi=on
+dtparam=i2c_arm_baudrate=400000
+dtoverlay=
+dtoverlay=pisound
+dtoverlay=vc4-kms-v3d
+usb_max_current_enable=1
+```
+
 sudo raspi-config
 ```
 

@@ -1,23 +1,13 @@
 #!/usr/bin/env python3
-import adafruit_ads1x15.ads1115 as ADS
-import board
-import busio
-import math
 import time
-import uinput
 import mido
 import logging
-import threading
 
-from adafruit_ads1x15.analog_in import AnalogIn
 from adafruit_mcp230xx.mcp23017 import MCP23017
 from digitalio import Direction, Pull
-from gpiozero import Button as GpioZeroButton, LED as GpioZeroLED
 from signal import pause
 
-from joystick import Joystick
 from mcp_button import MCPButton
-from mcp_led import MCPLed
 
 logger = logging.getLogger(__name__)
 
@@ -94,14 +84,14 @@ class RotaryEncoder:
 
             # 5. Check if the transition is valid and update
             if transition in RotaryEncoder.CW_transitions:
-                logger.debug(f"Encoder {self.name} Rotated → (clockwise)")
+                # logger.debug(f"Encoder {self.name} Rotated → (clockwise)")
                 self.last_state = current_state # Update state after a valid step
                 direction = 1
                 # logger.info(f"{encoder['name']} turned {direction}, send to {encoder['cc']}")
                 self.increment_cc_value(direction)
 
             elif transition in RotaryEncoder.CCW_transitions:
-                logger.debug(f"Encoder {self.name} Rotated → (counterclockwise)")
+                # logger.debug(f"Encoder {self.name} Rotated → (counterclockwise)")
                 self.last_state = current_state # Update state after a valid step
                 direction = -1
                 # logger.debug(f"{encoder['name']} turned {direction}, send to {encoder['cc']}")
@@ -122,7 +112,7 @@ class RotaryEncoder:
             # The key is to only update last_state *after* a valid transition has completed.
 
     def send_cc(self, value):
-        logger.info(f"RotaryEncoder.send_cc {self.name}: {self.cc}, {value}")
+        # logger.info(f"RotaryEncoder.send_cc {self.name}: {self.cc}, {value}")
         msg = mido.Message('control_change', control=self.cc, value=value)
         self.midi_out.send(msg)
 
@@ -134,7 +124,7 @@ class RotaryEncoder:
         if new_value != current_value:
             self.midi_value = new_value
             self.send_cc(new_value)
-            logger.debug(f"{self.name} CC {self.cc} adjusted to {new_value}")
+            # logger.debug(f"{self.name} CC {self.cc} adjusted to {new_value}")
 
     def poll_thread(self):
         while True:
@@ -144,6 +134,10 @@ class RotaryEncoder:
 
 # === Main ===
 if __name__ == "__main__":
+    import board
+    import busio
+    import threading
+
     i2c = busio.I2C(board.SCL, board.SDA)
     mcp = MCP23017(i2c, address=0x20)
     # --- MIDI SETUP ---

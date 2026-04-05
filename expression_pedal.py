@@ -58,12 +58,12 @@ class ExpressionPedal:
                 self._current_midi_val = smoothed_val
                 self.send_midi(smoothed_val)
 
-            time.sleep(0.1)
+            time.sleep(0.01)
 
     def send_midi(self, value):
         msg = mido.Message('control_change', control=MIDI_CC_NUMBER, value=value)
         self.midi_out.send(msg)
-        logger.debug(f"Pedal: Sent MIDI CC {MIDI_CC_NUMBER}: {value}")
+        # logger.debug(f"Pedal: Sent MIDI CC {MIDI_CC_NUMBER}: {value}")
 
 
 if __name__ == "__main__":

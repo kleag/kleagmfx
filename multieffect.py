@@ -68,7 +68,7 @@ def midi_input_thread():
     # logger.info("Listening for incoming MIDI messages...")
     for msg in midi_in:
         if msg.type == 'control_change':
-            logger.info(f"midi_input_thread received: {msg}")
+            # logger.info(f"midi_input_thread received: {msg}")
             # Update Effect States (SWITCH_CC)
             if SWITCH_CC <= msg.control <= SWITCH_CC + 3:
                 idx = msg.control - SWITCH_CC
@@ -79,7 +79,7 @@ def midi_input_thread():
                     effect_states[idx] = new_state
                     if leds[idx] is not None:
                         leds[idx].value = new_state
-                logger.debug(f"Sync: LED {idx} set to {new_state} via MIDI")
+                # logger.debug(f"Sync: LED {idx} set to {new_state} via MIDI")
             # Update Encoder CC Value if received externally
             if msg.control in ENCODER_CC_NUMBERS:
                 for enc in encoders:
