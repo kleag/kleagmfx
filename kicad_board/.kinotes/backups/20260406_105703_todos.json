@@ -1,0 +1,44 @@
+[
+  {
+    "text": "Schematic Review",
+    "done": false,
+    "time_spent": 0,
+    "history": [],
+    "is_running": false
+  },
+  {
+    "text": "Layout Check",
+    "done": false,
+    "time_spent": 0,
+    "history": [],
+    "is_running": false
+  },
+  {
+    "text": "Design Verification",
+    "done": false,
+    "time_spent": 0,
+    "history": [],
+    "is_running": false
+  },
+  {
+    "text": "Add cutting switch 1x1 socket",
+    "done": false,
+    "time_spent": 0,
+    "history": [],
+    "is_running": false
+  },
+  {
+    "text": "Add Wha1 10k resistor",
+    "done": false,
+    "time_spent": 0,
+    "history": [],
+    "is_running": false
+  },
+  {
+    "text": "Resize tracks following good practices",
+    "done": false,
+    "time_spent": 0,
+    "history": [],
+    "is_running": false
+  }
+]
