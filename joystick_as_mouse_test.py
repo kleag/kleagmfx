@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
-import time
-import math
-from adafruit_ads1x15.analog_in import AnalogIn
 import adafruit_ads1x15.ads1115 as ADS
-from board import SCL, SDA
-import busio
 import board
-from digitalio import Direction, Pull
-from adafruit_mcp230xx.mcp23017 import MCP23017
+import busio
+import math
+import time
 import uinput
 
+from adafruit_ads1x15.analog_in import AnalogIn
+from adafruit_mcp230xx.mcp23017 import MCP23017
+from board import SCL, SDA
+from digitalio import Direction, Pull
+from rich.console import Console
+
+
 # --- Configuration ---
-SENSITIVITY = 10.0 # Mouse movement sensitivity (higher value = faster movement)
-DEAD_ZONE = 0.1    # Ignore movements within this normalized radius of the center (0.0 to 1.0)
-POWER_CURVE = 2.0  # Speed scaling: 1.0 is linear, >1.0 makes small movements slower (e.g., 2.0 for quadratic)
+SENSITIVITY = 50.0 # Mouse movement sensitivity (higher value = faster movement)
+DEAD_ZONE = 0.02    # Ignore movements within this normalized radius of the center (0.0 to 1.0)
+# POWER_CURVE = 2.0  # Speed scaling: 1.0 is linear, >1.0 makes small movements slower (e.g., 2.0 for quadratic)
+POWER_CURVE = math.log(1/SENSITIVITY) / math.log(0.02)  # Exponent to match 1px/s at 0.02, 100px/s at 1.0
 LOOP_DELAY = 0.01  # Delay between joystick readings (seconds)
 
 # --- Hardware Setup ---
@@ -59,7 +63,7 @@ def read_joystick():
     # Joystick gives ~0V to ~3.3V, midpoint around 1.65V
     # Read the full range of voltage: 0V to 3.3V
     # A center voltage of 1.65 is an estimate; you might need to calibrate this
-    x_center = 1.65
+    x_center = 1.62
     y_center = 1.65
     x = (x_axis.voltage - x_center) / x_center
     y = (y_axis.voltage - y_center) / y_center
@@ -68,37 +72,54 @@ def read_joystick():
     # The ADS1115 P1 (Y-axis) increases voltage when pulling the stick *down*, which should be *positive* screen Y movement.
     # The calculation below for y returns a negative value when pulled down (V < V_center), so we invert it for screen movement.
     y = -y
+    x = -x
 
     return max(-1, min(1, x)), max(-1, min(1, y))
 
-def calculate_speed(x, y):
-    """
-    Calculates movement speed based on joystick position.
-    Applies dead zone and power curve scaling.
-    """
-    # Calculate distance from center (magnitude)
-    magnitude = math.sqrt(x**2 + y**2)
 
-    # Apply dead zone
-    if magnitude < DEAD_ZONE:
-        return 0, 0
+# State variables (keep these outside your loop)
+last_x = 0
+last_y = 0
+spike_count_x = 0
+spike_count_y = 0
 
-    # Scale magnitude: (distance - dead_zone) / (1 - dead_zone)
-    # This maps the range [DEAD_ZONE, 1.0] to [0.0, 1.0]
-    scaled_magnitude = (magnitude - DEAD_ZONE) / (1.0 - DEAD_ZONE)
+def calculate_speed_stable(x, y):
+    global last_x, last_y, spike_count_x, spike_count_y
 
-    # Apply power curve scaling for "logarithmic-like" behavior
-    # For POWER_CURVE=2.0, speed is proportional to magnitude^2, making small movements very slow.
-    speed_factor = math.pow(scaled_magnitude, POWER_CURVE) * SENSITIVITY
-
-    # Recalculate movement vector based on new speed factor
-    # We maintain the direction (x/magnitude, y/magnitude)
-    if magnitude > 0:
-        dx = (x / magnitude) * speed_factor
-        dy = (y / magnitude) * speed_factor
-        return dx, dy
+    # --- 1. Glitch Guard Logic ---
+    # If the reading is exactly 1.0 (or -1.0) and we were just at 0
+    if abs(x) > 0.99 and abs(last_x) < 0.1:
+        spike_count_x += 1
+        if spike_count_x < 2: # Ignore the first frame of a max-value spike
+            x = 0
     else:
-        return 0, 0
+        spike_count_x = 0
+
+    if abs(y) > 0.99 and abs(last_y) < 0.1:
+        spike_count_y += 1
+        if spike_count_y < 2:
+            y = 0
+    else:
+        spike_count_y = 0
+
+    last_x, last_y = x, y
+
+    # --- 2. Axial Dead Zone Logic ---
+    # X Axis
+    if abs(x) < DEAD_ZONE:
+        dx = 0
+    else:
+        norm_x = (abs(x) - DEAD_ZONE) / (1.0 - DEAD_ZONE)
+        dx = math.pow(norm_x, POWER_CURVE) * math.copysign(SENSITIVITY, x)
+
+    # Y Axis
+    if abs(y) < DEAD_ZONE:
+        dy = 0
+    else:
+        norm_y = (abs(y) - DEAD_ZONE) / (1.0 - DEAD_ZONE)
+        dy = math.pow(norm_y, POWER_CURVE) * math.copysign(SENSITIVITY, y)
+
+    return dx, dy
 
 try:
     print(f"Joystick Mouse Control Active. Sensitivity: {SENSITIVITY}, Dead Zone: {DEAD_ZONE}, Power Curve: {POWER_CURVE}")
@@ -109,11 +130,25 @@ try:
         x, y = read_joystick()
 
         # 2. Calculate Movement
-        dx, dy = calculate_speed(x, y)
+        dx, dy = calculate_speed_stable(x, y)
 
         switch_state = switch.value  # True = not pressed, False = pressed
-        print(f"X: {x_axis.voltage:.3f} V ({x:+.2f}) dx={dx}, Y: {y_axis.voltage:.3f} V ({y:+.2f}) dy={dy}, Switch: {'Released' if switch_state else 'Pressed'}",
-              end="\r")
+
+        console = Console()
+
+
+        # The Logic:
+        # .2f handles the two digits after the comma.
+        # style="..." adds colors to make it easy to read at a glance.
+        status_text = (
+            f"[bold blue]X:[/bold blue] {x_axis.voltage:+5.2f}V ({x:+5.2f}) [dim]dx={dx:+6.2f}[/dim] | "
+            f"[bold magenta]Y:[/bold magenta] {y_axis.voltage:+5.2f}V ({y:+5.2f}) [dim]dy={dy:+6.2f}[/dim] | "
+            f"[bold yellow]Switch:[/bold yellow] {'Released' if switch_state else 'Pressed'}"
+        )
+        console.print(status_text, end="\r")
+
+        # print(f"X: {x_axis.voltage:.3f} V ({x:+.2f}) dx={dx}, Y: {y_axis.voltage:.3f} V ({y:+.2f}) dy={dy}, Switch: {'Released' if switch_state else 'Pressed'}",
+              # end="\r")
 
         # 3. Move Mouse (Using UInput)
         if dx != 0 or dy != 0:
