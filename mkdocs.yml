@@ -1,0 +1,24 @@
+site_name: KleagMFX Documentation
+site_url: https://kleag.github.io/kleagmfx/
+repo_url: https://github.com/kleag/kleagmfx
+edit_uri: edit/main/docs/
+
+theme:
+  name: material # Le thème le plus populaire (pro et moderne)
+  palette:
+    primary: indigo
+    accent: indigo
+  features:
+    - navigation.tabs
+    - content.code.copy
+
+nav:
+  - Accueil: index.md
+  - Installation: installation.md
+  - Guide d'utilisation: usage.md
+  - Architecture Audio: architecture.md
+
+markdown_extensions:
+  - pymdownx.highlight
+  - pymdownx.superfences # Nécessaire pour les diagrammes Mermaid
+  - tables
