@@ -12,8 +12,8 @@ from adafruit_ads1x15.analog_in import AnalogIn
 from signal import pause
 
 # The actual voltages measured at the physical limits of the pedal
-V_MIN = 0.012750000000000001
-V_MAX = 3.02525
+V_MIN = 0.006
+V_MAX = 2.768
 MIDI_CC_NUMBER = 24
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ class ExpressionPedal:
             self.readings.pop(0)
             self.readings.append(clamped)
             smoothed_val = int(statistics.median(self.readings))
-            # logger.debug(f"Pedal: {voltage};\t{clamped};\t{smoothed_val}")
+            logger.debug(f"Pedal: {voltage};\t{clamped};\t{smoothed_val}")
 
             # Only send MIDI message if the value has actually changed
             if abs(smoothed_val - self._current_midi_val) >= 4:
@@ -63,19 +63,20 @@ class ExpressionPedal:
     def send_midi(self, value):
         msg = mido.Message('control_change', control=MIDI_CC_NUMBER, value=value)
         self.midi_out.send(msg)
-        # logger.debug(f"Pedal: Sent MIDI CC {MIDI_CC_NUMBER}: {value}")
+        logger.debug(f"Pedal: Sent MIDI CC {MIDI_CC_NUMBER}: {value}")
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     i2c = busio.I2C(board.SCL, board.SDA)
+    i2c_lock = threading.Lock()
     ads = ADS.ADS1115(i2c)
     # --- MIDI SETUP ---
     # This creates a virtual MIDI port that shows up in patchage/qjackctl
     midi_out = mido.open_output('ExpressionPedalPort', virtual=True)
     logger.info("Virtual MIDI port 'ExpressionPedalPort' created.")
 
-    pedal = ExpressionPedal(midi_out, i2c, ads, ADS.P2)
+    pedal = ExpressionPedal(midi_out, ads, i2c_lock)
 
     t = threading.Thread(target=pedal.poll, daemon=True)
     t.start()
