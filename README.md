@@ -78,6 +78,30 @@ systemctl --user stop multieffect.service
 systemctl --user start multieffect.service
 ```
 
+# Disable wlan power management 
+To avoid losing Wifi unexpectedly, disable its power management. Create `/etc/systemd/system/wifi-fix.service`:
+
+
+```ini
+[Unit]
+Description=Disable WiFi Power Management
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/iwconfig wlan0 power off
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+```
+
+and then enable the new service:
+```bash
+sudo systemctl enable wifi-fix.service
+sudo systemctl start wifi-fix.service
+```
+
 # License
 
 Copyright Gaël de Chalendar, 2025-2026.
