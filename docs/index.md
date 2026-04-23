@@ -1,8 +1,15 @@
 # Kleag's MFX
 
+Thi site describes the multieffect pedal I built using a Raspberry Pi, a Pisound sound card, the Guitarix effects software, a repurposed wooden box and various other parts. I am at version 2.2.1 of the pedal, but just beginning the documentation. 
+
+To start with, here are two images of the current version:
+
 ![The Multieffect pedal running](images/img3.jpg)
 
-Test 2
+![The interior of the Multieffect pedal](images/img2.jpg)
+
+In the future, I will describe the material and software architecture and the history of the making.
+
 
 ADS1115
 MCP23017
