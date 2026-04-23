@@ -30,7 +30,7 @@ dependencies = [
     "numpy==1.24.2",
     "evdev==1.6.1",
     "pynput==1.7.5",
-    "tqdm==4.64.1",
+    "tqdm==4.66.3",
     "thonny==4.1.4",
 
     "rich==13.3.1",
